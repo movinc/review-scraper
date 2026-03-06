@@ -63,6 +63,7 @@ body{font-family:'Inter','Noto Sans JP',system-ui,sans-serif;background:var(--bg
 .badge{display:inline-flex;align-items:center;gap:4px;padding:3px 10px;border-radius:12px;font-size:10px;font-weight:700;letter-spacing:0.03em;text-transform:uppercase;flex-shrink:0}
 .badge.running{background:var(--warning-bg);color:var(--warning)}
 .badge.done{background:var(--success-bg);color:var(--success)}
+.badge.cancelled{background:var(--surface2);color:var(--text-tertiary)}
 .badge.failed{background:var(--danger-bg);color:var(--danger)}
 .badge .dot{width:5px;height:5px;border-radius:50%;background:currentColor}
 .badge.running .dot{animation:blink 1.4s ease-in-out infinite}
@@ -419,7 +420,7 @@ function render(){
   if(!jobs.length){list.innerHTML='<div class="empty">URLを入力して取得開始</div>';return}
   list.innerHTML=jobs.map(j=>{
     const st=j.status;
-    const stLbl={running:'実行中',done:'完了',failed:'失敗'}[st]||st;
+    const stLbl={running:'実行中',done:'完了',failed:'失敗',cancelled:'停止'}[st]||st;
     let statsHtml='';
     if(j.count)statsHtml+=j.count+'件';
     if(st==='done'&&j.duration!=null){statsHtml+=(statsHtml?' · ':'')+'所要 '+fmtDur(j.duration);const c=fmtCost(j.duration);if(c)statsHtml+=' · '+c}
@@ -445,7 +446,7 @@ function render(){
       </div>
       <div class="job-actions">
         <span class="time-label">${fmtTime(j.time)}</span>
-        <button class="abtn" onclick="showPanel('${j.id}','logs')">📋ログ</button>${st==='done'?`<button class="abtn" onclick="showPanel('${j.id}','results')">結果</button><button class="abtn dl" onclick="dlCsv('${j.id}')">CSV</button><button class="abtn dl" onclick="dlJson('${j.id}')">JSON</button>`:''}
+        ${st==='running'?`<button class="abtn del" onclick="cancelJob('${j.id}')">⏹停止</button>`:''}<button class="abtn" onclick="showPanel('${j.id}','logs')">📋ログ</button>${st==='done'?`<button class="abtn" onclick="showPanel('${j.id}','results')">結果</button><button class="abtn dl" onclick="dlCsv('${j.id}')">CSV</button><button class="abtn dl" onclick="dlJson('${j.id}')">JSON</button>`:''}
         <button class="abtn del" onclick="removeJob('${j.id}')">削除</button>
       </div>
       <div class="job-detail ${detailOpen}" id="detail-${j.id}">
@@ -470,6 +471,7 @@ async function loadLogs(id){const el=document.getElementById('logs-'+id);if(!el)
 
 async function dlCsv(id){let revs=cache[id];if(!revs){try{const r=await fetch("/jobs/"+id+"/reviews");revs=await r.json();if(Array.isArray(revs))cache[id]=revs;else return}catch{return}}if(!revs.length){alert('レビューデータがありません。再スクレイプしてください。');return};const rows=revs.map(r=>[r.review_id,r.author,r.rating,r.posted_at,r.comment].map(v=>'"'+(v||'').replace(/"/g,'""')+'"').join(','));dl(new Blob(['\uFEFF'+'review_id,投稿者,Rating,posted_at,コメント\n'+rows.join('\n')],{type:'text/csv'}),'reviews.csv')}
 async function dlJson(id){let revs=cache[id];if(!revs){try{const r=await fetch("/jobs/"+id+"/reviews");revs=await r.json();if(Array.isArray(revs))cache[id]=revs;else return}catch{return}}if(!revs.length){alert('レビューデータがありません。再スクレイプしてください。');return};dl(new Blob([JSON.stringify(revs,null,2)],{type:'application/json'}),'reviews.json')}
+async function cancelJob(id){if(!confirm('このジョブを停止しますか？'))return;try{const r=await fetch('/jobs/'+id+'/cancel',{method:'POST'});const d=await r.json();if(d.ok){const j=jobs.find(j=>j.id===id);if(j){j.status='cancelled';j.message='停止'}render()}}catch(e){alert('停止失敗: '+e.message)}}
 async function copyLogs(id){try{const r=await fetch('/jobs/'+id+'/logs');const logs=await r.json();if(!logs.length){alert('ログなし');return}const text=logs.map(l=>{const t=new Date(l.time).toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit',second:'2-digit'});return t+' '+l.message}).join('\n');await navigator.clipboard.writeText(text);const btn=event.target;btn.textContent='✅コピー済';setTimeout(()=>btn.textContent='📋コピー',1500)}catch(e){alert('コピー失敗: '+e.message)}}
 function dl(b,n){const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=n;a.click()}
 

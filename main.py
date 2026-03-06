@@ -49,7 +49,7 @@ async def scrape_async(req: ScrapeRequest):
     cutoff = datetime.now(timezone.utc) - timedelta(minutes=DUPLICATE_URL_MINUTES)
     for existing in db.list_jobs(limit=20):
         if (existing.get("url") == req.url
-            and existing.get("status") == JobStatus.running
+            and existing.get("status") in (JobStatus.running, "running")
             and existing.get("created_at")):
             try:
                 if datetime.fromisoformat(existing["created_at"]) > cutoff:
@@ -99,6 +99,19 @@ def get_job_reviews(job_id: str):
     return JSONResponse(content=db.get_job_reviews(job_id))
 
 
+
+
+@app.post("/jobs/{job_id}/cancel")
+def cancel_job(job_id: str):
+    job = db.get_job(job_id)
+    if not job:
+        return JSONResponse(content={"error": "Job not found"}, status_code=404)
+    if job.get("status") != JobStatus.running:
+        return JSONResponse(content={"error": "Job is not running"}, status_code=400)
+    db.update_job(job_id, status=JobStatus.cancelled, message="ユーザーにより停止")
+    db.append_log(job_id, "ジョブ停止（ユーザー操作）")
+    return JSONResponse(content={"ok": True, "job_id": job_id, "status": "cancelled"})
+
 @app.delete("/jobs/{job_id}")
 def delete_job(job_id: str):
     db.delete_job(job_id)
@@ -115,6 +128,10 @@ async def _run_scrape(job_id: str, url: str, source: Source):
     start = _time.time()
 
     def on_progress(count: int, message: str):
+        # Check if job was cancelled
+        job = db.get_job(job_id)
+        if job and job.get('status') in ('cancelled', JobStatus.cancelled):
+            raise RuntimeError('ジョブが停止されました')
         db.update_job(job_id, progress=count, message=message, review_count=count)
         db.append_log(job_id, message)
 
