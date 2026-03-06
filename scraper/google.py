@@ -332,13 +332,25 @@ def _start_session(url: str, progress_callback=None, proxy: str | None = None):
             progress_callback(0, "ソート完了、レビュー読み込み待機中...")
 
         found = False
-        for i in range(3):
-            if query_all_first(page, GOOGLE["review_text"]) or query_all_first(page, GOOGLE["review_block"]):
+        # まずwait_for_selectorで最大15秒待つ
+        for sel in ['[data-review-id]', '.jftiEf', '.wiI7pd']:
+            try:
+                page.wait_for_selector(sel, timeout=15000)
                 found = True
+                if progress_callback:
+                    progress_callback(0, f"レビュー要素検出 (selector: {sel})")
                 break
-            if progress_callback:
-                progress_callback(0, f"レビュー要素を待機中... ({i + 1}/3)")
-            time.sleep(2)
+            except Exception:
+                continue
+        # フォールバック: ポーリング
+        if not found:
+            for i in range(5):
+                if query_all_first(page, GOOGLE["review_text"]) or query_all_first(page, GOOGLE["review_block"]):
+                    found = True
+                    break
+                if progress_callback:
+                    progress_callback(0, f"レビュー要素を待機中... ({i + 1}/5)")
+                time.sleep(3)
 
         if found:
             if progress_callback:
