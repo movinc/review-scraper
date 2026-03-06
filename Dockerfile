@@ -17,7 +17,7 @@ RUN pip install --no-cache-dir -r requirements.txt \
     && python -m playwright install chromium \
     && python -m playwright install-deps chromium
 
-# cache-bust: 1772830632
+ARG CACHEBUST=1772830984
 COPY . .
 
 EXPOSE 8080
