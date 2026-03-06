@@ -19,9 +19,11 @@ from config import (
     GOOGLE_TAB_WAIT_SECONDS,
     GOOGLE_PROFILE_BASE,
     MAX_RETRIES,
+    TOR_PROXY_URL,
 )
 from utils.date_parser import parse_japanese_date
 from utils.tor import get_proxy_for_retry
+import utils.tor as tor_utils
 from css_selectors import GOOGLE, query_first, query_all_first
 
 
@@ -87,11 +89,7 @@ def _ensure_reviews_tab(url: str) -> str:
 
 
 def scrape_google_reviews(url: str, progress_callback=None, review_save_callback=None) -> list[dict]:
-    """Scrape all reviews from a Google Maps URL.
-
-    Uses StealthySession with direct Playwright page manipulation.
-    Includes retry logic (up to MAX_RETRIES attempts) for the ~30% failure rate.
-    """
+    """Scrape all reviews from a Google Maps URL."""
     url = _resolve_url(url)
     url = _ensure_reviews_tab(url)
     _clean_browser_profiles()
@@ -101,7 +99,7 @@ def scrape_google_reviews(url: str, progress_callback=None, review_save_callback
     session = None
     try:
         page, session = _start_session(url, progress_callback)
-        reviews = _collect_all_reviews(page, progress_callback, review_save_callback)
+        reviews = _collect_all_reviews(page, session, url, progress_callback, review_save_callback)
         return reviews
     finally:
         if session:
@@ -195,8 +193,16 @@ def _sort_by_newest(page, progress_callback=None):
         pass
 
 
-def _start_session(url: str, progress_callback=None):
-    """Start a StealthySession and navigate to the URL with retries."""
+def _start_session(url: str, progress_callback=None, proxy: str | None = None):
+    """Start a StealthySession and navigate to the URL.
+
+    Args:
+        url: Target Google Maps URL.
+        progress_callback: Optional progress reporting callback.
+        proxy: Explicit proxy URL. If None with no explicit call context,
+               uses get_proxy_for_retry logic across MAX_RETRIES attempts.
+               If called with proxy explicitly set (even None), only tries once.
+    """
     last_error = ""
     for retry in range(MAX_RETRIES):
         profile_dir = os.path.join(GOOGLE_PROFILE_BASE, uuid.uuid4().hex[:8])
@@ -206,16 +212,16 @@ def _start_session(url: str, progress_callback=None):
             progress_callback(0, f"セッション開始中... (試行 {retry + 1}/{MAX_RETRIES}, profile: {os.path.basename(profile_dir)})")
 
         try:
-            proxy = get_proxy_for_retry(retry)
-            if proxy and progress_callback:
+            effective_proxy = proxy if proxy is not None else get_proxy_for_retry(retry)
+            if effective_proxy and progress_callback:
                 progress_callback(0, "Tor回線更新済み、新IP経由で接続中...")
             session_kwargs = dict(
                 headless=True,
                 locale="ja-JP",
                 user_data_dir=profile_dir,
             )
-            if proxy:
-                session_kwargs["proxy"] = {"server": proxy}
+            if effective_proxy:
+                session_kwargs["proxy"] = {"server": effective_proxy}
             session = StealthySession(**session_kwargs)
             session.start()
         except Exception as e:
@@ -400,8 +406,69 @@ def _scroll_reviews(page):
     )
 
 
-def _collect_all_reviews(page, progress_callback=None, review_save_callback=None) -> list[dict]:
-    """Scroll through all reviews and collect them incrementally."""
+def _try_stage1_recovery(page, progress_callback=None) -> bool:
+    """Stage 1: ページリフレッシュで回復試行。成功したらTrue。"""
+    try:
+        if progress_callback:
+            progress_callback(0, "Stage 1: ページリフレッシュで回復試行中...")
+        page.reload(wait_until="domcontentloaded", timeout=30000)
+        time.sleep(8)
+        _click_reviews_tab(page)
+        _sort_by_newest(page, progress_callback)
+        time.sleep(3)
+        if query_all_first(page, GOOGLE["review_text"]) or query_all_first(page, GOOGLE["review_block"]):
+            return True
+        return False
+    except Exception:
+        return False
+
+
+def _try_stage2_recovery(session, url: str, progress_callback=None):
+    """Stage 2: 新プロファイルで再起動（同IP）。成功時に (page, new_session) を返す。失敗時は (None, None)。"""
+    try:
+        if progress_callback:
+            progress_callback(0, "Stage 2: 新プロファイルで回復試行中...")
+        try:
+            session.close()
+        except Exception:
+            pass
+        new_page, new_session = _start_session(url, progress_callback)
+        return new_page, new_session
+    except Exception:
+        return None, None
+
+
+def _try_stage3_recovery(session, url: str, progress_callback=None):
+    """Stage 3: Tor回線更新 + 新プロファイルで再起動（別IP）。成功時に (page, new_session) を返す。失敗時は (None, None)。"""
+    try:
+        if progress_callback:
+            progress_callback(0, "Stage 3: Tor回線更新 + 新プロファイルで回復試行中...")
+        tor_ok = tor_utils.renew_circuit()
+        proxy = TOR_PROXY_URL if tor_ok else None
+        try:
+            session.close()
+        except Exception:
+            pass
+        new_page, new_session = _start_session(url, progress_callback, proxy=proxy)
+        return new_page, new_session
+    except Exception:
+        return None, None
+
+
+def _collect_all_reviews(
+    page,
+    session,
+    url: str,
+    progress_callback=None,
+    review_save_callback=None,
+) -> list[dict]:
+    """Scroll through all reviews and collect them incrementally.
+
+    Implements a 3-stage stall recovery mechanism:
+      Stage 1: Page refresh (same session/IP)
+      Stage 2: New browser profile (same IP)
+      Stage 3: Tor circuit renewal + new profile (new IP)
+    """
     saved_ids: set = set()
     all_reviews: list[dict] = []
 
@@ -413,13 +480,58 @@ def _collect_all_reviews(page, progress_callback=None, review_save_callback=None
 
     no_new = 0
     last_new_time = time.time()
+    recovery_stage = 0  # 0=未試行, 1=Stage1試行済み, 2=Stage2試行済み, 3=Stage3試行済み
+
     for i in range(GOOGLE_MAX_SCROLLS):
         _scroll_reviews(page)
         time.sleep(GOOGLE_SCROLL_INTERVAL)
 
         if time.time() - last_new_time > GOOGLE_STALL_SECONDS:
+            # --- スタル検知: 段階的回復を試みる ---
+            if recovery_stage == 0:
+                # Stage 1: ページリフレッシュ
+                recovered = _try_stage1_recovery(page, progress_callback)
+                recovery_stage = 1
+                if recovered:
+                    last_new_time = time.time()
+                    no_new = 0
+                    continue
+                # Stage 1失敗 → 即Stage 2へ
+
+            if recovery_stage == 1:
+                # Stage 2: 新プロファイル（同IP）
+                new_page, new_session = _try_stage2_recovery(session, url, progress_callback)
+                recovery_stage = 2
+                if new_page is not None:
+                    page = new_page
+                    session = new_session
+                    recovered_reviews = _extract_reviews_from_dom(page, saved_ids)
+                    all_reviews.extend(recovered_reviews)
+                    if review_save_callback and recovered_reviews:
+                        review_save_callback(recovered_reviews)
+                    last_new_time = time.time()
+                    no_new = 0
+                    continue
+                # Stage 2失敗 → 即Stage 3へ
+
+            if recovery_stage == 2:
+                # Stage 3: Tor + 新プロファイル（別IP）
+                new_page, new_session = _try_stage3_recovery(session, url, progress_callback)
+                recovery_stage = 3
+                if new_page is not None:
+                    page = new_page
+                    session = new_session
+                    recovered_reviews = _extract_reviews_from_dom(page, saved_ids)
+                    all_reviews.extend(recovered_reviews)
+                    if review_save_callback and recovered_reviews:
+                        review_save_callback(recovered_reviews)
+                    last_new_time = time.time()
+                    no_new = 0
+                    continue
+
+            # 全Stage失敗 → 収集終了
             if progress_callback:
-                progress_callback(len(all_reviews), f"{GOOGLE_STALL_SECONDS}秒間新規レビューなし、収集終了 ({len(all_reviews)}件)")
+                progress_callback(len(all_reviews), f"全回復Stage失敗、収集終了 ({len(all_reviews)}件)")
             final = _extract_reviews_from_dom(page, saved_ids)
             all_reviews.extend(final)
             break
@@ -441,6 +553,7 @@ def _collect_all_reviews(page, progress_callback=None, review_save_callback=None
             else:
                 no_new = 0
                 last_new_time = time.time()
+                recovery_stage = 0  # 新規レビューが見つかったら回復stageをリセット
 
         if no_new >= GOOGLE_NO_NEW_THRESHOLD:
             final = _extract_reviews_from_dom(page, saved_ids)
