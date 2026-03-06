@@ -435,7 +435,7 @@ function render(){
         <div class="job-info">
           <div class="job-title"><a href="${esc(j.url)}" target="_blank" onclick="event.stopPropagation()">${esc(j.name)}</a> <span class="src-tag ${j.source}">${srcLabel(j.source)}</span></div>
           <div class="job-url"><a href="${esc(j.url)}" target="_blank" onclick="event.stopPropagation()">${esc(j.url)}</a></div>
-          <div class="job-stats"><span class="j-stats">${statsHtml}</span></div>
+          <div class="job-stats"><span class="j-stats">${statsHtml}</span> <span style="color:var(--text-tertiary);font-size:10px;font-family:var(--mono);user-select:all">${j.id}</span></div>
           ${progHtml}${errHtml}
         </div>
         <span class="badge ${st}"><span class="dot"></span>${stLbl}</span>
