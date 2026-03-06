@@ -148,6 +148,7 @@ def _warm_up_session(page, session):
 
         page.goto("https://www.google.co.jp/", wait_until="domcontentloaded", timeout=60000)
         time.sleep(3)
+        check2 = _check_cookies(session)
         page.goto("https://www.google.com/maps", wait_until="domcontentloaded", timeout=60000)
         time.sleep(3)
 
@@ -278,6 +279,8 @@ def _start_session(url: str, progress_callback=None):
         # Resolve share.google URLs in browser (JS redirect)
         url = _resolve_share_url_in_browser(page, url)
 
+        if progress_callback:
+            progress_callback(0, f"ページ読み込み中... {url[:60]}...")
         try:
             referer = generate_convincing_referer(url)
             page.goto(
@@ -317,13 +320,17 @@ def _start_session(url: str, progress_callback=None):
 
         # Try clicking reviews tab
         if progress_callback:
-            progress_callback(0, "クチコミタブをクリック中...")
-        _click_reviews_tab(page)
+            progress_callback(0, f"クチコミタブをクリック中... (タブ{tab_count}個検出)")
+        clicked = _click_reviews_tab(page)
+        if progress_callback:
+            progress_callback(0, f"タブクリック {'成功' if clicked else '失敗'}")
 
         # Sort by newest
         if progress_callback:
             progress_callback(0, "新しい順にソート中...")
         _sort_by_newest(page)
+        if progress_callback:
+            progress_callback(0, "ソート完了、レビュー読み込み待機中...")
 
         # Poll for review elements
         found = False
@@ -460,9 +467,10 @@ def _collect_all_reviews(page, progress_callback=None) -> list[dict]:
             _cleanup_heavy_elements(page)
             if progress_callback:
                 if new:
-                    progress_callback(len(all_reviews), f"スクロール中... {len(all_reviews)}件取得")
-                elif i % 15 == 14:
-                    progress_callback(len(all_reviews), f"スクロール中... {len(all_reviews)}件 (新規なし {no_new+1}/5)")
+                    progress_callback(len(all_reviews), f"スクロール中... {len(all_reviews)}件取得 (scroll {i+1})")
+                elif i % 6 == 5:
+                    elapsed = int(time.time() - last_new_time)
+                    progress_callback(len(all_reviews), f"スクロール中... {len(all_reviews)}件 (新規なし {elapsed}秒/{no_new+1}回)")
             if len(new) == 0:
                 no_new += 1
             else:
