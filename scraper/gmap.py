@@ -127,6 +127,29 @@ def _click_reviews_tab(page):
     return clicked
 
 
+def _sort_by_newest(page):
+    """Sort reviews by newest first."""
+    try:
+        sort_btn = page.query_selector('button[aria-label="クチコミの並べ替え"]')
+        if not sort_btn:
+            return
+        sort_btn.click()
+        time.sleep(2)
+        # Click "新しい順" (data-index=1)
+        page.evaluate("""() => {
+            const items = document.querySelectorAll('[role="menuitemradio"]');
+            for (const item of items) {
+                if (item.getAttribute('data-index') === '1') {
+                    item.click();
+                    return;
+                }
+            }
+        }""")
+        time.sleep(3)
+    except Exception:
+        pass
+
+
 def _start_session(url: str):
     """Start a StealthySession and navigate to the URL with retries."""
     import os
@@ -164,6 +187,9 @@ def _start_session(url: str):
 
         # Try clicking reviews tab first
         _click_reviews_tab(page)
+
+        # Sort by newest
+        _sort_by_newest(page)
 
         # Poll for review elements
         found = False
