@@ -301,13 +301,15 @@ def _start_session(url: str, progress_callback=None):
         time.sleep(8)
 
         # Early detection: check if page has tabs (概要/クチコミ/写真/基本情報)
-        tab_count = len(page.query_selector_all('button[role="tab"]'))
+        tabs = page.query_selector_all('button[role="tab"]')
+        tab_names = [t.text_content().strip() for t in tabs]
+        has_review_tab = any('クチコミ' in n for n in tab_names)
         if progress_callback:
-            progress_callback(0, f"タブ検出: {tab_count}個")
+            progress_callback(0, f"タブ検出: {len(tabs)}個 ({', '.join(tab_names)})")
 
-        if tab_count < 4:
+        if not has_review_tab:
             if progress_callback:
-                progress_callback(0, f"タブ{tab_count}個（クチコミタブなし）、Cookieリセットしてリトライ...")
+                progress_callback(0, f"クチコミタブなし（{', '.join(tab_names)}）、リトライ...")
             try:
                 session.close()
             except Exception:
@@ -321,7 +323,7 @@ def _start_session(url: str, progress_callback=None):
 
         # Try clicking reviews tab
         if progress_callback:
-            progress_callback(0, f"クチコミタブをクリック中... (タブ{tab_count}個検出)")
+            progress_callback(0, f"クチコミタブをクリック中... ({len(tab_names)}個: {', '.join(tab_names)})")
         clicked = _click_reviews_tab(page)
         if progress_callback:
             progress_callback(0, f"タブクリック {'成功' if clicked else '失敗'}")
