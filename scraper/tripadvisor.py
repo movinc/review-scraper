@@ -52,7 +52,7 @@ def scrape_tripadvisor_reviews(url: str, progress_callback=None) -> list[dict]:
 
                 # Navigate to first page of reviews
                 page_url = base.format("")
-                page.goto(page_url, wait_until="networkidle", timeout=60000)
+                page.goto(page_url, wait_until="domcontentloaded", timeout=30000)
                 time.sleep(5)
 
                 html2 = page.content()
@@ -122,7 +122,7 @@ def scrape_tripadvisor_reviews(url: str, progress_callback=None) -> list[dict]:
                     offset = f"-or{page_num * 15}"
                     next_url = base.format(offset)
                     try:
-                        page.goto(next_url, wait_until="networkidle", timeout=60000)
+                        page.goto(next_url, wait_until="domcontentloaded", timeout=30000)
                         time.sleep(3)
                         html_next = page.content()
                         if "captcha-delivery" in html_next:

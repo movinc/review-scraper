@@ -146,17 +146,17 @@ def _warm_up_session(page, session):
         if not check["missing"]:
             return True  # Already has required cookies
 
-        page.goto("https://www.google.co.jp/", wait_until="domcontentloaded", timeout=60000)
+        page.goto("https://www.google.co.jp/", wait_until="domcontentloaded", timeout=15000)
         time.sleep(3)
         check2 = _check_cookies(session)
-        page.goto("https://www.google.com/maps", wait_until="domcontentloaded", timeout=60000)
+        page.goto("https://www.google.com/maps", wait_until="domcontentloaded", timeout=15000)
         time.sleep(3)
 
         # Verify cookies were set
         check = _check_cookies(session)
         if check["missing"]:
             # Try one more time with longer wait
-            page.goto("https://www.google.co.jp/search?q=maps", wait_until="domcontentloaded", timeout=60000)
+            page.goto("https://www.google.co.jp/search?q=maps", wait_until="domcontentloaded", timeout=15000)
             time.sleep(3)
             check = _check_cookies(session)
 
@@ -284,7 +284,7 @@ def _start_session(url: str, progress_callback=None):
         try:
             referer = generate_convincing_referer(url)
             page.goto(
-                url, referer=referer, wait_until="networkidle", timeout=60000
+                url, referer=referer, wait_until="domcontentloaded", timeout=30000
             )
         except Exception as e:
             last_error = f"ページ読み込み失敗: {e}"
@@ -297,7 +297,8 @@ def _start_session(url: str, progress_callback=None):
             time.sleep(3)
             continue
 
-        time.sleep(5)
+        # Wait for dynamic content
+        time.sleep(8)
 
         # Early detection: check if page has tabs (概要/クチコミ/写真/基本情報)
         tab_count = len(page.query_selector_all('button[role="tab"]'))
@@ -334,17 +335,13 @@ def _start_session(url: str, progress_callback=None):
 
         # Poll for review elements
         found = False
-        for i in range(5):
-            if page.query_selector_all(".wiI7pd"):
-                found = True
-                break
-            # Also try data-review-id as fallback
-            if page.query_selector_all("[data-review-id]"):
+        for i in range(3):
+            if page.query_selector_all(".wiI7pd") or page.query_selector_all("[data-review-id]"):
                 found = True
                 break
             if progress_callback:
-                progress_callback(0, f"レビュー要素を待機中... ({i + 1}/5)")
-            time.sleep(3)
+                progress_callback(0, f"レビュー要素を待機中... ({i + 1}/3)")
+            time.sleep(2)
 
         if found:
             if progress_callback:
