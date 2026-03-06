@@ -10,6 +10,10 @@ def scrape_tripadvisor_reviews(url: str, progress_callback=None) -> list[dict]:
     pagination offsets. If not, pagination offset is inserted after 'Reviews'.
     """
     base_url = _prepare_base_url(url)
+    # Validate domain
+    if "tripadvisor" not in url:
+        raise ValueError("TripAdvisorのURLを入力してください")
+
     all_reviews = []
     page_num = 0
 
