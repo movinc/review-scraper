@@ -428,29 +428,21 @@ def _cleanup_heavy_elements(page):
             """() => {
             document.querySelectorAll('[data-review-id] img, [data-review-id] picture, [data-review-id] svg').forEach(el => el.remove());
             document.querySelectorAll('canvas, .Tya61d, .p0Aybe, .cYrDcb').forEach(el => el.remove());
-        }""",
-            timeout=10000,
-        )
+        }""")
     except Exception:
         pass
 
 
 def _scroll_reviews(page):
-    """Scroll the reviews container to load more."""
+    """Scroll the reviews container using mouse.wheel (human-like)."""
     try:
-        page.evaluate(
-            """() => {
-            const els = document.querySelectorAll('div.m6QErb');
-            for (const el of els) {
-                if (el.scrollHeight > el.clientHeight && el.scrollHeight > 500) {
-                    el.scrollTop = el.scrollHeight;
-                }
-            }
-        }""",
-            timeout=10000,
-        )
+        # Focus on the scrollable review panel first
+        panel = page.query_selector('div.m6QErb.DxyBCb')
+        if panel:
+            panel.hover()
+        page.mouse.wheel(0, 800)
     except Exception:
-        pass  # Timeout = page might be unresponsive, continue loop
+        pass
 
 
 def _try_stage1_recovery(page, progress_callback=None, count: int = 0) -> bool:
