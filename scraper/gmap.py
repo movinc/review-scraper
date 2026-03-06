@@ -386,11 +386,14 @@ def _extract_reviews_from_dom(page, saved_ids: set) -> list[dict]:
             text_el = block.query_selector(".wiI7pd")
 
             author = (author_el.text_content() or "").strip() if author_el else ""
-            rating = (
+            raw_rating = (
                 (rating_el.get_attribute("aria-label") or "").strip()
                 if rating_el
                 else ""
             )
+            import re
+            m = re.search(r'(\d)', raw_rating)
+            rating = m.group(1) if m else raw_rating
             date = (date_el.text_content() or "").strip() if date_el else ""
             comment = (text_el.text_content() or "").strip() if text_el else ""
 
