@@ -142,3 +142,15 @@ def list_jobs(limit: int = 50) -> list[dict]:
             })
     results.sort(key=lambda x: x.get("created_at", ""), reverse=True)
     return results[:limit]
+
+
+def delete_job(job_id: str):
+    """Delete a job from Firestore and in-memory."""
+    _mem.pop(job_id, None)
+    db = _get_db()
+    if db:
+        doc_ref = db.collection(COLLECTION).document(job_id)
+        # Delete subcollection (reviews)
+        for review in doc_ref.collection("reviews").limit(500).stream():
+            review.reference.delete()
+        doc_ref.delete()

@@ -78,6 +78,12 @@ def list_jobs():
     return JSONResponse(content=db.list_jobs())
 
 
+@app.delete("/jobs/{job_id}")
+def delete_job(job_id: str):
+    db.delete_job(job_id)
+    return JSONResponse(content={"ok": True})
+
+
 async def _run_scrape(job_id: str, url: str, source: Source):
     try:
         def progress_callback(count: int, message: str):

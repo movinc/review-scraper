@@ -468,8 +468,15 @@
         setHistoryData(h);
     }
     function updateHistory(jid,u) { const h=getHistory(); const i=h.find(x=>x.jobId===jid); if(i)Object.assign(i,u); setHistoryData(h); }
-    function removeHistory(jid) { removeReviewsLocal(jid); setHistoryData(getHistory().filter(x=>x.jobId!==jid)); }
-    function clearHistory() { if(confirm('履歴をすべて削除しますか？')){getHistory().forEach(x=>removeReviewsLocal(x.jobId));setHistoryData([]);} }
+    function removeHistory(jid) {
+        removeReviewsLocal(jid);
+        setHistoryData(getHistory().filter(x=>x.jobId!==jid));
+        fetch('/jobs/'+jid, {method:'DELETE'}).catch(()=>{});
+    }
+    function clearHistory() { if(confirm('履歴をすべて削除しますか？')){
+            getHistory().forEach(x=>{removeReviewsLocal(x.jobId);fetch('/jobs/'+x.jobId,{method:'DELETE'}).catch(()=>{});});
+            setHistoryData([]);
+        } }
 
     function renderHistory() {
         const h = getHistory();
