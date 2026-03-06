@@ -405,7 +405,7 @@ def _extract_reviews_from_dom(page, saved_ids: set) -> list[dict]:
                         "review_id": rid,
                         "author": author,
                         "rating": rating,
-                        "date": date,
+                        "posted_at": date,
                         "comment": comment,
                     }
                 )

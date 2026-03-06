@@ -296,5 +296,5 @@ def _parse_review_card(card) -> dict | None:
 
     return {
         "review_id": review_id, "author": author,
-        "rating": rating, "date": date, "comment": comment,
+        "rating": rating, "posted_at": date, "comment": comment,
     }
