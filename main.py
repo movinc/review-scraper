@@ -137,6 +137,24 @@ async def _run_scrape(job_id: str, url: str, source: Source):
                       message=f"{JOB_TIMEOUT_SECONDS // 60}分タイムアウトで終了")
         db.append_log(job_id, f"{JOB_TIMEOUT_SECONDS // 60}分タイムアウトで強制終了")
     except Exception as e:
+        duration = int(_time.time() - start)
         db.update_job(job_id, status=JobStatus.failed, error=str(e),
-                      duration=int(_time.time() - start),
+                      duration=duration,
                       message=f"エラー: {e}")
+        # 失敗時にインスタンス切り替えリトライ（最大1回）
+        job = db.get_job(job_id)
+        retry_count = job.get("retry_count", 0) if job else 0
+        if retry_count < 1:
+            import httpx, os
+            try:
+                port = os.environ.get("PORT", "8080")
+                base = f"http://localhost:{port}"
+                new_job_id = uuid.uuid4().hex[:8]
+                db.create_job(new_job_id, url, source.value)
+                db.update_job(new_job_id, retry_count=retry_count + 1,
+                              message=f"リトライ (元ジョブ: {job_id})")
+                db.append_log(new_job_id, f"インスタンス切替リトライ (元: {job_id}, 失敗理由: {str(e)[:80]})")
+                db.update_job(job_id, message=f"エラー: {e} → リトライ: {new_job_id}")
+                asyncio.create_task(_run_scrape(new_job_id, url, source))
+            except Exception as retry_err:
+                db.append_log(job_id, f"リトライ失敗: {retry_err}")
