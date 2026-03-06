@@ -403,9 +403,18 @@ def _collect_all_reviews(page, progress_callback=None) -> list[dict]:
 
     # Scroll loop
     no_new = 0
+    last_new_time = time.time()
     for i in range(2000):
         _scroll_reviews(page)
         time.sleep(1.0)
+
+        # Time-based stall: 60s with no new reviews → done
+        if time.time() - last_new_time > 60:
+            if progress_callback:
+                progress_callback(len(all_reviews), f"60秒間新規レビューなし、収集終了 ({len(all_reviews)}件)")
+            final = _extract_reviews_from_dom(page, saved_ids)
+            all_reviews.extend(final)
+            break
 
         # Every 3 scrolls: save + cleanup
         if i % 3 == 2:
@@ -421,6 +430,7 @@ def _collect_all_reviews(page, progress_callback=None) -> list[dict]:
                 no_new += 1
             else:
                 no_new = 0
+                last_new_time = time.time()
 
         # 20 consecutive rounds with no new reviews -> done
         if no_new >= 5:
