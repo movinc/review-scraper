@@ -21,7 +21,19 @@ def scrape_tripadvisor_reviews(url: str, progress_callback=None) -> list[dict]:
         offset = f"-or{page_num * 15}" if page_num > 0 else ""
         page_url = base_url.format(offset)
 
-        page = StealthyFetcher.fetch(page_url, headless=True, network_idle=True)
+        try:
+            page = StealthyFetcher.fetch(page_url, headless=True, network_idle=True)
+        except Exception as e:
+            if progress_callback:
+                progress_callback(len(all_reviews), f"ページ{page_num + 1}取得失敗: {e}")
+            break
+
+        # Check for HTTP error (403 etc)
+        if hasattr(page, 'status') and page.status and page.status >= 400:
+            if progress_callback:
+                progress_callback(len(all_reviews), f"HTTP {page.status}エラー、取得終了")
+            break
+
         cards = page.css('[data-automation="reviewCard"]')
 
         if not cards:
