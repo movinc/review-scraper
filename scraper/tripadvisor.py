@@ -141,13 +141,30 @@ def scrape_tripadvisor_reviews(url: str, progress_callback=None) -> list[dict]:
         try:
             action_fn = make_action(base_url, progress_callback, result, start_time, max_time)
 
-            StealthyFetcher.fetch(
-                domain + "/",
+            fetch_kwargs = dict(
                 headless=True,
                 network_idle=True,
                 google_search=True,
                 page_action=action_fn,
                 wait=5,
+            )
+            # Use Tor proxy on retries
+            if attempt > 0:
+                import socket
+                try:
+                    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                    s.settimeout(3)
+                    if s.connect_ex(("127.0.0.1", 9050)) == 0:
+                        fetch_kwargs["proxy"] = "socks5://127.0.0.1:9050"
+                        if progress_callback:
+                            progress_callback(0, "Tor経由で接続中...")
+                    s.close()
+                except Exception:
+                    pass
+
+            StealthyFetcher.fetch(
+                domain + "/",
+                **fetch_kwargs,
             )
 
             if result["error"]:

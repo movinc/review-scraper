@@ -7,7 +7,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libcups2 libdrm2 libdbus-1-3 libxkbcommon0 \
     libatspi2.0-0 libxcomposite1 libxdamage1 libxrandr2 \
     libgbm1 libpango-1.0-0 libcairo2 libasound2 \
-    libxshmfence1 fonts-noto-cjk \
+    libxshmfence1 fonts-noto-cjk tor \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -21,4 +21,4 @@ COPY . .
 
 EXPOSE 8080
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
+CMD bash -c "tor --SocksPort 9050 --DataDirectory /tmp/tor-data --Log 'notice stdout' &>/dev/null & sleep 2 && uvicorn main:app --host 0.0.0.0 --port 8080"

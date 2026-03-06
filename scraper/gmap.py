@@ -8,6 +8,33 @@ import shutil
 import glob
 
 
+
+def _renew_tor_circuit():
+    """Request new Tor circuit (new IP) via control port or by restarting."""
+    import socket
+    try:
+        # Simple approach: connect to Tor SOCKS to verify it's running
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.settimeout(3)
+        result = s.connect_ex(("127.0.0.1", 9050))
+        s.close()
+        return result == 0
+    except Exception:
+        return False
+
+
+TOR_PROXY = "socks5://127.0.0.1:9050"
+
+
+def _get_proxy_for_retry(retry: int) -> str | None:
+    """Return proxy for this retry attempt. None = direct, str = proxy URL."""
+    if retry == 0:
+        return None  # First attempt: direct (might work)
+    if _renew_tor_circuit():
+        return TOR_PROXY
+    return None
+
+
 def _resolve_url(url: str) -> str:
     """Resolve short URLs and ensure full Google Maps URL format."""
     # Expand short URLs (maps.app.goo.gl, goo.gl)
@@ -204,11 +231,17 @@ def _start_session(url: str, progress_callback=None):
             os.remove(lock_file)
 
         try:
-            session = StealthySession(
+            proxy = _get_proxy_for_retry(retry)
+            session_kwargs = dict(
                 headless=True,
                 locale="ja-JP",
                 user_data_dir=profile_dir,
             )
+            if proxy:
+                session_kwargs["proxy"] = {"server": proxy}
+                if progress_callback:
+                    progress_callback(0, f"Tor経由で接続中...")
+            session = StealthySession(**session_kwargs)
             session.start()
         except Exception as e:
             last_error = f"セッション起動失敗: {e}"
