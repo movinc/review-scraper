@@ -16,6 +16,25 @@ import db
 app = FastAPI(title="Review Scraper API")
 
 
+@app.on_event("startup")
+def cleanup_stale_jobs():
+    """Mark running jobs older than 30 minutes as failed (stale from previous instance)."""
+    from datetime import datetime, timezone, timedelta
+    cutoff = datetime.now(timezone.utc) - timedelta(minutes=30)
+    for job in db.list_jobs():
+        if job.get("status") == "running":
+            created = job.get("created_at", "")
+            try:
+                t = datetime.fromisoformat(created)
+                if t < cutoff:
+                    db.update_job(job["job_id"], status="failed",
+                                  error="サーバー再起動によりタイムアウト",
+                                  message="タイムアウト（30分超過）")
+            except Exception:
+                pass
+
+
+
 class Source(str, Enum):
     gmap = "gmap"
     tripadvisor = "tripadvisor"
