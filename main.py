@@ -3,7 +3,6 @@ import asyncio
 import csv
 import io
 import uuid
-from datetime import datetime, timezone
 from enum import Enum
 
 from fastapi import FastAPI
@@ -12,11 +11,9 @@ from pydantic import BaseModel
 
 from scraper.gmap import scrape_gmap_reviews
 from scraper.tripadvisor import scrape_tripadvisor_reviews
+import db
 
 app = FastAPI(title="Review Scraper API")
-
-# In-memory job store (per-instance, lost on scale-to-zero)
-jobs: dict[str, dict] = {}
 
 
 class Source(str, Enum):
@@ -36,40 +33,30 @@ def index():
 
 @app.post("/scrape")
 async def scrape_async(req: ScrapeRequest):
-    """Start a scraping job asynchronously. Returns job_id immediately."""
     job_id = str(uuid.uuid4())[:8]
-    jobs[job_id] = {
-        "job_id": job_id,
-        "url": req.url,
-        "source": req.source.value,
-        "status": "running",
-        "progress": 0,
-        "message": "開始中...",
-        "created_at": datetime.now(timezone.utc).isoformat(),
-        "reviews": [],
-    }
+    db.create_job(job_id, req.url, req.source.value)
     asyncio.create_task(_run_scrape(job_id, req.url, req.source))
     return JSONResponse(content={"job_id": job_id, "status": "running"}, status_code=202)
 
 
 @app.get("/jobs/{job_id}")
 def get_job(job_id: str):
-    """Get job status and results."""
-    job = jobs.get(job_id)
+    job = db.get_job(job_id)
     if not job:
         return JSONResponse(content={"error": "Job not found"}, status_code=404)
     resp = {
-        "job_id": job["job_id"],
-        "url": job["url"],
-        "source": job["source"],
-        "status": job["status"],
-        "progress": job["progress"],
-        "message": job["message"],
-        "created_at": job["created_at"],
-        "review_count": len(job["reviews"]),
+        "job_id": job.get("job_id", job_id),
+        "url": job.get("url", ""),
+        "source": job.get("source", ""),
+        "status": job.get("status", ""),
+        "progress": job.get("progress", 0),
+        "message": job.get("message", ""),
+        "created_at": job.get("created_at", ""),
+        "review_count": job.get("review_count", len(job.get("reviews", []))),
     }
-    if job["status"] in ("done", "failed"):
-        resp["reviews"] = job["reviews"]
+    if job.get("status") in ("done", "failed"):
+        if job.get("status") == "done":
+            resp["reviews"] = db.get_job_reviews(job_id)
         if job.get("error"):
             resp["error"] = job["error"]
     return JSONResponse(content=resp)
@@ -77,53 +64,38 @@ def get_job(job_id: str):
 
 @app.get("/jobs/{job_id}/csv")
 def get_job_csv(job_id: str):
-    """Download job results as CSV."""
-    job = jobs.get(job_id)
+    job = db.get_job(job_id)
     if not job:
         return JSONResponse(content={"error": "Job not found"}, status_code=404)
-    if job["status"] != "done":
+    if job.get("status") != "done":
         return JSONResponse(content={"error": "Job not finished"}, status_code=400)
-    return _csv_response(job["reviews"])
+    reviews = db.get_job_reviews(job_id)
+    return _csv_response(reviews)
 
 
 @app.get("/jobs")
 def list_jobs():
-    """List all jobs (summary only)."""
-    return JSONResponse(content=[
-        {
-            "job_id": j["job_id"],
-            "url": j["url"],
-            "source": j["source"],
-            "status": j["status"],
-            "progress": j["progress"],
-            "review_count": len(j["reviews"]),
-            "created_at": j["created_at"],
-        }
-        for j in sorted(jobs.values(), key=lambda x: x["created_at"], reverse=True)
-    ])
+    return JSONResponse(content=db.list_jobs())
 
 
 async def _run_scrape(job_id: str, url: str, source: Source):
-    """Run scraping in a thread pool and update job state."""
-    job = jobs[job_id]
     try:
         def progress_callback(count: int, message: str):
-            job["progress"] = count
-            job["message"] = message
+            db.update_job(job_id, progress=count, message=message, review_count=count)
 
         if source == Source.gmap:
             reviews = await asyncio.to_thread(scrape_gmap_reviews, url, progress_callback)
         else:
             reviews = await asyncio.to_thread(scrape_tripadvisor_reviews, url, progress_callback)
 
-        job["reviews"] = reviews
-        job["status"] = "done"
-        job["progress"] = len(reviews)
-        job["message"] = f"完了: {len(reviews)}件取得"
+        # Save reviews to Firestore subcollection
+        db.save_reviews(job_id, reviews)
+        # Update in-memory + Firestore doc
+        db.update_job(job_id, status="done", progress=len(reviews),
+                      message=f"完了: {len(reviews)}件取得", reviews=reviews)
     except Exception as e:
-        job["status"] = "failed"
-        job["error"] = str(e)
-        job["message"] = f"エラー: {str(e)}"
+        db.update_job(job_id, status="failed", error=str(e),
+                      message=f"エラー: {str(e)}")
 
 
 def _csv_response(reviews: list[dict]) -> StreamingResponse:
