@@ -123,7 +123,12 @@ def scrape_tripadvisor_reviews(url: str, progress_callback=None) -> list[dict]:
                     next_url = base.format(offset)
                     try:
                         page.goto(next_url, wait_until="domcontentloaded", timeout=30000)
-                        time.sleep(3)
+                        # Wait for cards to render
+                        for _w in range(8):
+                            time.sleep(1)
+                            if page.query_selector('[data-automation="reviewCard"]'):
+                                break
+                        time.sleep(1)
                         html_next = page.content()
                         if "captcha-delivery" in html_next:
                             if pcb:
