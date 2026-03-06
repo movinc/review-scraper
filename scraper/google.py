@@ -244,6 +244,12 @@ def _start_session(url: str, progress_callback=None, proxy: str | None = None):
             else session.context.new_page()
         )
 
+        # Block heavy resources (images only - NOT stylesheets/fonts, Google Maps SPA needs them)
+        page.route(
+            "**/*.{png,jpg,jpeg,gif,webp,svg,mp4,mp3}",
+            lambda route: route.abort(),
+        )
+
         if progress_callback:
             progress_callback(0, "Cookie取得中...")
         cookies_ok = _warm_up_session(page, session)
