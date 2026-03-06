@@ -64,7 +64,7 @@ def scrape_gmap_reviews(url: str, progress_callback=None) -> list[dict]:
     url = _ensure_reviews_tab(url)
     _clean_browser_profiles()
     # Validate domain
-    if not any(d in url for d in ["google.com/maps", "google.co.jp/maps", "maps.app.goo.gl", "maps.google"]):
+    if not any(d in url.lower() for d in ["google.com/maps", "google.co.jp/maps", "maps.app.goo.gl", "maps.google"]):
         raise ValueError("Google MapsのURLを入力してください")
 
     session = None

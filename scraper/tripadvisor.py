@@ -11,7 +11,7 @@ def scrape_tripadvisor_reviews(url: str, progress_callback=None) -> list[dict]:
     """
     base_url = _prepare_base_url(url)
     # Validate domain
-    if "tripadvisor" not in url:
+    if "tripadvisor" not in url.lower():
         raise ValueError("TripAdvisorのURLを入力してください")
 
     all_reviews = []
