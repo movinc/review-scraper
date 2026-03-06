@@ -113,6 +113,12 @@ def scrape_tripadvisor_reviews(url: str, progress_callback=None, review_save_cal
                         pcb(len(all_reviews), f"ページ{page_num + 1}: {new_count}件取得 (合計{len(all_reviews)}件)")
 
                     if new_count == 0:
+                        if pcb:
+                            pcb(len(all_reviews), f"ページ{page_num + 1}: 新規0件、収集完了")
+                        break
+                    if new_count < 15:
+                        if pcb:
+                            pcb(len(all_reviews), f"ページ{page_num + 1}: {new_count}件（15未満=最終ページ）、収集完了")
                         break
 
                     page_num += 1
@@ -122,13 +128,21 @@ def scrape_tripadvisor_reviews(url: str, progress_callback=None, review_save_cal
                     # Next page
                     offset = f"-or{page_num * 15}"
                     next_url = base.format(offset)
+                    if pcb:
+                        pcb(len(all_reviews), f"ページ{page_num + 1}へ遷移中... ({next_url[-30:]})")
                     try:
                         page.goto(next_url, wait_until="domcontentloaded", timeout=30000)
                         # Wait for cards to render
+                        card_found = False
                         for _w in range(8):
                             time.sleep(1)
                             if page.query_selector('[data-automation="reviewCard"]'):
+                                card_found = True
                                 break
+                        if not card_found and pcb:
+                            pcb(len(all_reviews), f"ページ{page_num + 1}: カード未検出、終了")
+                        if not card_found:
+                            break
                         time.sleep(1)
                         html_next = page.content()
                         if "captcha-delivery" in html_next:
