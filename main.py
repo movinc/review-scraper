@@ -159,11 +159,14 @@ async def _run_scrape(job_id: str, url: str, source: Source):
     import time as _time
     start = _time.time()
 
+    _progress_counter = [0]
     def on_progress(count: int, message: str):
-        # Check if job was cancelled
-        job = db.get_job(job_id)
-        if job and job.get('status') in ('cancelled', JobStatus.cancelled):
-            raise RuntimeError('ジョブが停止されました')
+        _progress_counter[0] += 1
+        # Check cancellation every 5 calls
+        if _progress_counter[0] % 5 == 0:
+            job = db.get_job(job_id)
+            if job and job.get('status') in ('cancelled', JobStatus.cancelled):
+                raise RuntimeError('ジョブが停止されました')
         db.update_job(job_id, progress=count, message=message, review_count=count)
         db.append_log(job_id, message)
 
