@@ -36,7 +36,8 @@ def cleanup_stale_jobs():
 
 
 class Source(str, Enum):
-    gmap = "gmap"
+    google = "google"
+    gmap = "gmap"  # backward compat
     tripadvisor = "tripadvisor"
 
 
@@ -143,7 +144,7 @@ async def _run_scrape(job_id: str, url: str, source: Source):
             db.update_job(job_id, progress=count, message=message, review_count=count)
             db.append_log(job_id, message)
 
-        if source == Source.gmap:
+        if source in (Source.google, Source.gmap):
             reviews = await asyncio.to_thread(scrape_gmap_reviews, url, progress_callback)
         else:
             reviews = await asyncio.to_thread(scrape_tripadvisor_reviews, url, progress_callback)
