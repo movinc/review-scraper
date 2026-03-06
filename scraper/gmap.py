@@ -81,10 +81,36 @@ def scrape_gmap_reviews(url: str) -> list[dict]:
                 pass
 
 
+PROFILE_DIR = "/tmp/gmap-browser-profile"
+
+
+def _warm_up_session(page, session):
+    """Visit Google properties to accumulate cookies for trust score."""
+    try:
+        cookies = session.context.cookies()
+        google_cookies = [c for c in cookies if "google" in c.get("domain", "")]
+        if google_cookies:
+            return  # Already has Google cookies
+
+        page.goto("https://www.google.co.jp/", wait_until="domcontentloaded", timeout=30000)
+        time.sleep(2)
+        page.goto("https://www.google.com/maps", wait_until="domcontentloaded", timeout=30000)
+        time.sleep(2)
+    except Exception:
+        pass
+
+
 def _start_session(url: str):
     """Start a StealthySession and navigate to the URL with retries."""
+    import os
+    os.makedirs(PROFILE_DIR, exist_ok=True)
+
     for retry in range(5):
-        session = StealthySession(headless=True)
+        session = StealthySession(
+            headless=True,
+            locale="ja-JP",
+            user_data_dir=PROFILE_DIR,
+        )
         session.start()
         page = (
             session.context.pages[0]
@@ -97,6 +123,9 @@ def _start_session(url: str):
             "**/*.{png,jpg,jpeg,gif,webp,svg,woff,woff2,ttf,mp4,mp3}",
             lambda route: route.abort(),
         )
+
+        # Warm up: visit Google to get cookies (critical for reviews tab)
+        _warm_up_session(page, session)
 
         referer = generate_convincing_referer(url)
         page.goto(
