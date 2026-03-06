@@ -262,31 +262,49 @@ def _prepare_base_url(url: str) -> str:
 
 def _parse_review_card(card) -> dict | None:
     """Parse a single TripAdvisor review card (Playwright element)."""
-    review_id = ""
+    import re
+
+    full_text = ""
     try:
-        links = card.query_selector_all('a[href*="ShowUserReviews"]')
-        for link in links:
-            href = link.get_attribute("href") or ""
-            m = re.search(r"-r(\d+)-", href)
-            if m:
-                review_id = m.group(1)
-                break
+        full_text = card.text_content() or ""
     except Exception:
         pass
 
+    # Review ID
+    review_id = ""
+    for attr in ["data-reviewid", "data-review-id"]:
+        val = card.get_attribute(attr) or ""
+        if val:
+            review_id = val
+            break
     if not review_id:
-        for attr in ["data-reviewid", "data-review-id"]:
-            val = card.get_attribute(attr) or ""
-            if val:
-                review_id = val
-                break
+        try:
+            links = card.query_selector_all('a[href*="ShowUserReviews"]')
+            for link in links:
+                href = link.get_attribute("href") or ""
+                m = re.search(r"-r(\d+)-", href)
+                if m:
+                    review_id = m.group(1)
+                    break
+        except Exception:
+            pass
+    if not review_id:
+        try:
+            plink = card.query_selector('a[href*="/Profile/"]')
+            if plink:
+                href = plink.get_attribute("href") or ""
+                m = re.search(r"/Profile/(\w+)", href)
+                if m:
+                    review_id = m.group(1)
+        except Exception:
+            pass
 
     # Author
     author = ""
     for sel in [
-        "a.BMQDV.ukgoS", "a.BMQDV:not([aria-hidden])", "span.biGQs._P.ezezH a",
-        "a.ui_header_link", "span.biGQs._P.fiohW.fOtGX",
-        "a[href*='/Profile/']:not([aria-hidden])", "[class*='username']",
+        "a.BMQDV.ukgoS", "a.BMQDV:not([aria-hidden])",
+        "a[href*=\'/Profile/\']:not([aria-hidden])",
+        "span.biGQs._P.ezezH a",
     ]:
         try:
             el = card.query_selector(sel)
@@ -297,36 +315,47 @@ def _parse_review_card(card) -> dict | None:
         except Exception:
             continue
 
-    # Rating
+    # Rating — SVG title in innerHTML or text fallback
     rating = ""
     try:
-        titles = card.query_selector_all("title")
-        for t in titles:
-            txt = t.text_content() or ""
-            if "バブル評価" in txt or "段階中" in txt or "of 5 bubbles" in txt:
-                m = re.search(r'(\d)\s*$', txt.strip())
-                rating = m.group(1) if m else txt.strip()
-                break
-        if not rating:
-            bubble = card.query_selector("[class*='bubble']")
-            if bubble:
-                raw = bubble.get_attribute("aria-label") or ""
-                m = re.search(r'(\d)\s*$', raw)
-                rating = m.group(1) if m else raw
+        html = card.inner_html()
+        m = re.search(r"<title[^>]*>(\d)(?:\.\d)?\s*of\s*5\s*bubbles</title>", html)
+        if m:
+            rating = m.group(1)
+        else:
+            m = re.search(r"<title[^>]*>バブル評価\s*5\s*段階中\s*(\d)", html)
+            if m:
+                rating = m.group(1)
     except Exception:
         pass
+    if not rating:
+        m = re.search(r"(\d)(?:\.\d)?\s*of\s*5\s*bubbles", full_text)
+        if m:
+            rating = m.group(1)
+        else:
+            m = re.search(r"バブル評価\s*5\s*段階中\s*(\d)", full_text)
+            if m:
+                rating = m.group(1)
 
     # Date
     date = ""
     try:
-        full_text = card.text_content() or ""
-        m = re.search(r"(\d{4}年\d{1,2}月)", full_text)
+        m = re.search(r"(\d{4})年(\d{1,2})月", full_text)
         if m:
-            date = m.group(1)
+            date = f"{m.group(1)}-{int(m.group(2)):02d}"
         else:
-            m2 = re.search(r"([A-Z][a-z]+ \d{4})", full_text)
-            if m2:
-                date = m2.group(1)
+            month_map = {
+                "Jan": "01", "Feb": "02", "Mar": "03", "Apr": "04",
+                "May": "05", "Jun": "06", "Jul": "07", "Aug": "08",
+                "Sep": "09", "Oct": "10", "Nov": "11", "Dec": "12",
+                "January": "01", "February": "02", "March": "03",
+                "April": "04", "June": "06", "July": "07",
+                "August": "08", "September": "09", "October": "10",
+                "November": "11", "December": "12",
+            }
+            m2 = re.search(r"([A-Z][a-z]{2,8})\s+(\d{4})", full_text)
+            if m2 and m2.group(1) in month_map:
+                date = f"{m2.group(2)}-{month_map[m2.group(1)]}"
     except Exception:
         pass
 
@@ -334,7 +363,7 @@ def _parse_review_card(card) -> dict | None:
     comment = ""
     for sel in [
         "div.biGQs._P.VImYz.AWdfh", "div.biGQs._P.pZUbB.KxBGd",
-        "[class*='reviewText']", ".partial_entry",
+        "span.biGQs._P.VImYz.AWdfh", "[class*=\'reviewText\']", ".partial_entry",
     ]:
         try:
             el = card.query_selector(sel)
@@ -344,28 +373,6 @@ def _parse_review_card(card) -> dict | None:
                     break
         except Exception:
             continue
-
-    # Fallback: if no rating found, try extracting from raw card text
-    if not rating:
-        try:
-            full = card.text_content() or ""
-            # Look for bubble rating pattern in full text
-            import re
-            m = re.search(r'(\d)\s*[/／]\s*5', full)
-            if m:
-                rating = m.group(1)
-            else:
-                # Try star count from SVG/aria
-                svgs = card.query_selector_all('svg')
-                filled = 0
-                for svg in svgs:
-                    cls = svg.get_attribute("class") or ""
-                    if "fill" in cls.lower() or "full" in cls.lower():
-                        filled += 1
-                if filled > 0:
-                    rating = str(filled)
-        except Exception:
-            pass
 
     if not comment and not rating:
         return None
