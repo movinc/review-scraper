@@ -176,8 +176,20 @@ tr:hover td{background:var(--surface2)}
   -d '{"url": "https://www.google.com/maps/place/...", "source": "google"}'
 
 # source: "google" (Google Maps) / "tripadvisor" (TripAdvisor)</div>
-        <div class="code-label">レスポンス 202</div>
-        <div class="ep-code">{"job_id": "a1b2c3d4", "status": "running"}</div>
+        <div class="code-label">リクエストボディ</div>
+        <div class="ep-code">{
+  "url": string,     // 必須。Google Maps または TripAdvisor の URL
+  "source": string   // 必須。"google" | "tripadvisor"
+}</div>
+        <div class="code-label">レスポンス 202 Accepted</div>
+        <div class="ep-code">{
+  "job_id": "a1b2c3d4",  // string: ジョブ固有ID（8文字hex）
+  "status": "running"     // string: 初期ステータス
+}</div>
+        <div class="code-label">エラーレスポンス</div>
+        <div class="ep-code">400: {"detail": "url is required"}           // URLまたはsource未指定
+400: {"detail": "Unsupported URL domain"}    // 対応外ドメイン
+409: {"error": "同一URLが実行中です", ...}     // 5分以内に同じURL実行中</div>
       </div>
 
       <h3>ジョブ状態確認</h3>
@@ -200,6 +212,28 @@ tr:hover td{background:var(--surface2)}
   "duration": 243,
   "message": "完了: 150件取得"
 }</div>
+        <div class="code-label">レスポンス（失敗）</div>
+        <div class="ep-code">{
+  "job_id": "a1b2c3d4",
+  "status": "failed",
+  "review_count": 0,
+  "duration": 386,
+  "message": "エラー: ...",
+  "error": "Google Maps レビュー取得失敗 (5回リトライ済み)"
+}</div>
+        <div class="code-label">フィールド</div>
+        <div class="ep-code">job_id       : string  — ジョブ固有ID
+status       : string  — "running" | "done" | "failed"
+progress     : number  — 現在の取得件数
+review_count : number  — 最終取得件数
+message      : string  — 現在のステップ説明
+duration     : number? — 所要秒数（完了/失敗時のみ）
+error        : string? — エラー詳細（失敗時のみ）
+url          : string  — 対象URL
+source       : string  — "google" | "tripadvisor"
+created_at   : string  — ジョブ作成日時（ISO 8601）</div>
+        <div class="code-label">エラー</div>
+        <div class="ep-code">404: {"error": "Job not found"}</div>
       </div>
 
 
@@ -214,12 +248,30 @@ tr:hover td{background:var(--surface2)}
   {"time": "2026-03-06T13:00:05Z", "message": "Cookie取得中..."},
   {"time": "2026-03-06T13:00:15Z", "message": "スクロール中... 45件取得"}
 ]</div>
+        <div class="code-label">フィールド</div>
+        <div class="ep-code">time    : string — タイムスタンプ（ISO 8601）
+message : string — ログメッセージ</div>
       </div>
 
       <h3>全ジョブ一覧</h3>
       <div class="ep">
         <div class="ep-head"><span class="method get">GET</span><span class="ep-path">/jobs</span></div>
-        <div class="ep-desc">全ジョブの一覧を返します（最新順、最大50件）。</div>
+        <div class="ep-desc">全ジョブの一覧を返します（最新順）。各要素は GET /jobs/{job_id} と同じ形式。</div>
+        <div class="code-label">レスポンス 200</div>
+        <div class="ep-code">[
+  {
+    "job_id": "a1b2c3d4",
+    "url": "https://www.google.com/maps/place/...",
+    "source": "google",
+    "status": "done",
+    "review_count": 150,
+    "duration": 243,
+    "message": "完了: 150件取得",
+    "created_at": "2026-03-06T15:35:30.541131+00:00",
+    "error": null
+  },
+  ...
+]</div>
       </div>
 
       <h3>レビュー取得</h3>
@@ -233,17 +285,22 @@ tr:hover td{background:var(--surface2)}
   {"review_id": "ghi789", "author": "佐藤次郎", "rating": "3", "posted_at": "2025-12-01", "comment": ""}
 ]</div>
         <div class="code-label">フィールド</div>
-        <div class="ep-code">review_id  : レビュー固有ID（サイト側のID）
-author     : 投稿者名
-rating     : 評価（1〜5の数字、文字列型）
-posted_at  : 投稿日（ISO 8601: YYYY-MM-DD）
-comment    : コメント本文（星のみの場合は空文字）</div>
+        <div class="ep-code">review_id  : string — レビュー固有ID（サイト側のID）
+author     : string — 投稿者名
+rating     : string — 評価（"1"〜"5"）
+posted_at  : string — 投稿日（ISO 8601: YYYY-MM-DD）
+comment    : string — コメント本文（星のみの場合は空文字 ""）</div>
+        <div class="code-label">エラー</div>
+        <div class="ep-code">404: {"error": "Job not found"}
+400: {"error": "Job not finished"}  // status が done 以外</div>
       </div>
 
       <h3>ジョブ削除</h3>
       <div class="ep">
         <div class="ep-head"><span class="method delete">DELETE</span><span class="ep-path">/jobs/{job_id}</span></div>
         <div class="ep-desc">ジョブとそのレビューデータ・ログを完全に削除します。</div>
+        <div class="code-label">レスポンス 200</div>
+        <div class="ep-code">{"ok": true}</div>
       </div>
     </div>
 
