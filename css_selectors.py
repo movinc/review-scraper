@@ -3,6 +3,10 @@ Centralized CSS selectors with fallbacks.
 When site layout changes, update selectors here only.
 """
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 # Google Maps
 GOOGLE = {
     # Review block container
@@ -91,24 +95,34 @@ TRIPADVISOR = {
 }
 
 
-def query_first(element, selectors: list[str]):
+def query_first(element, selectors: list[str], key: str = ""):
     """Try multiple selectors, return first match."""
-    for sel in selectors:
+    for i, sel in enumerate(selectors):
         try:
             el = element.query_selector(sel)
             if el:
+                if i > 0 and key:
+                    logger.warning(
+                        "セレクタ劣化検知: %s で %s 失敗、%s にフォールバック",
+                        key, selectors[0], sel,
+                    )
                 return el
         except Exception:
             continue
     return None
 
 
-def query_all_first(element, selectors: list[str]) -> list:
+def query_all_first(element, selectors: list[str], key: str = "") -> list:
     """Try multiple selectors for query_selector_all, return first non-empty."""
-    for sel in selectors:
+    for i, sel in enumerate(selectors):
         try:
             els = element.query_selector_all(sel)
             if els:
+                if i > 0 and key:
+                    logger.warning(
+                        "セレクタ劣化検知: %s で %s 失敗、%s にフォールバック",
+                        key, selectors[0], sel,
+                    )
                 return els
         except Exception:
             continue

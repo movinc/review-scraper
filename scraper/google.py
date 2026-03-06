@@ -171,7 +171,7 @@ def _click_reviews_tab(page):
     return clicked
 
 
-def _sort_by_newest(page):
+def _sort_by_newest(page, progress_callback=None):
     """Sort reviews by newest first."""
     try:
         sort_btn = query_first(page, GOOGLE["sort_button"])
@@ -189,6 +189,8 @@ def _sort_by_newest(page):
             }
         }""")
         time.sleep(3)
+        if progress_callback:
+            progress_callback(0, "新しい順にソート完了")
     except Exception:
         pass
 
@@ -294,7 +296,7 @@ def _start_session(url: str, progress_callback=None):
 
         if progress_callback:
             progress_callback(0, "新しい順にソート中...")
-        _sort_by_newest(page)
+        _sort_by_newest(page, progress_callback)
         if progress_callback:
             progress_callback(0, "ソート完了、レビュー読み込み待機中...")
 

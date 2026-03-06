@@ -67,6 +67,8 @@ def scrape_tripadvisor_reviews(url: str, progress_callback=None, review_save_cal
                     page_url += "&filterLang=ALL"
                 else:
                     page_url += "?filterLang=ALL"
+                if pcb:
+                    pcb(0, "全言語フィルタ適用: filterLang=ALL")
                 page.goto(page_url, wait_until="domcontentloaded", timeout=TA_PAGE_TIMEOUT_MS)
                 for _w in range(TA_CARD_WAIT_SECONDS):
                     time.sleep(1)
@@ -141,6 +143,8 @@ def scrape_tripadvisor_reviews(url: str, progress_callback=None, review_save_cal
                         next_url += "&filterLang=ALL"
                     else:
                         next_url += "?filterLang=ALL"
+                    if pcb:
+                        pcb(len(all_reviews), f"ページ{page_num + 1}: filterLang=ALL 適用済み")
                     if pcb:
                         pcb(len(all_reviews), f"ページ{page_num + 1}へ遷移中... ({next_url[-30:]})")
                     try:
