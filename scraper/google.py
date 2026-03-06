@@ -494,45 +494,19 @@ def _collect_all_reviews(
 
     no_new = 0
     last_new_time = time.time()
-    recovery_stage = 0  # 0=未試行, 1=Stage1試行済み, 2=Stage2試行済み, 3=Stage3試行済み
 
     for i in range(GOOGLE_MAX_SCROLLS):
         _scroll_reviews(page)
         time.sleep(GOOGLE_SCROLL_INTERVAL)
 
         if time.time() - last_new_time > GOOGLE_STALL_SECONDS:
-            # --- スタル検知: 段階的回復を試みる ---
-            if recovery_stage == 0:
-                # Stage 1: ページリフレッシュ
-                recovered = _try_stage1_recovery(page, progress_callback, count=len(saved_ids))
-                recovery_stage = 1
-                if recovered:
-                    last_new_time = time.time()
-                    no_new = 0
-                    continue
-                # Stage 1失敗 → Stage 2スキップ、即Stage 3へ（同IP無意味）
-                recovery_stage = 2
-
-            if recovery_stage == 2:  # Stage 2はスキップ
-                # Stage 3: Tor + 新プロファイル（別IP）
-                new_page, new_session = _try_stage3_recovery(session, url, progress_callback, count=len(saved_ids))
-                recovery_stage = 3
-                if new_page is not None:
-                    page = new_page
-                    session = new_session
-                    recovered_reviews = _extract_reviews_from_dom(page, saved_ids)
-                    all_reviews.extend(recovered_reviews)
-                    if review_save_callback and recovered_reviews:
-                        review_save_callback(recovered_reviews)
-                    last_new_time = time.time()
-                    no_new = 0
-                    continue
-
-            # 全Stage失敗 → 収集終了
+            # スクロール停止 → 取れた分で完了（部分成功）
             if progress_callback:
-                progress_callback(len(all_reviews), f"全回復Stage失敗、収集終了 ({len(all_reviews)}件)")
+                progress_callback(len(all_reviews), f"{GOOGLE_STALL_SECONDS}秒間新規なし、収集終了 ({len(all_reviews)}件)")
             final = _extract_reviews_from_dom(page, saved_ids)
             all_reviews.extend(final)
+            if review_save_callback and final:
+                review_save_callback(final)
             break
 
         if i % 3 == 2:
@@ -552,7 +526,6 @@ def _collect_all_reviews(
             else:
                 no_new = 0
                 last_new_time = time.time()
-                recovery_stage = 0  # 新規レビューが見つかったら回復stageをリセット
 
         if no_new >= GOOGLE_NO_NEW_THRESHOLD:
             final = _extract_reviews_from_dom(page, saved_ids)
