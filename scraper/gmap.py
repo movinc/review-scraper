@@ -105,9 +105,9 @@ def _warm_up_session(page, session):
         if google_cookies:
             return  # Already has Google cookies
 
-        page.goto("https://www.google.co.jp/", wait_until="domcontentloaded", timeout=30000)
+        page.goto("https://www.google.co.jp/", wait_until="domcontentloaded", timeout=60000)
         time.sleep(2)
-        page.goto("https://www.google.com/maps", wait_until="domcontentloaded", timeout=30000)
+        page.goto("https://www.google.com/maps", wait_until="domcontentloaded", timeout=60000)
         time.sleep(2)
     except Exception:
         pass
@@ -195,7 +195,7 @@ def _start_session(url: str):
 
         referer = generate_convincing_referer(url)
         page.goto(
-            url, referer=referer, wait_until="domcontentloaded", timeout=60000
+            url, referer=referer, wait_until="networkidle", timeout=120000
         )
 
         # Wait for page to load, then click reviews tab
