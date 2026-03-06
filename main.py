@@ -164,11 +164,25 @@ async def _run_scrape(job_id: str, url: str, source: Source):
         _progress_counter[0] += 1
         # Check cancellation every 5 calls
         if _progress_counter[0] % 5 == 0:
-            job = db.get_job(job_id)
-            if job and job.get('status') in ('cancelled', JobStatus.cancelled):
-                raise RuntimeError('ジョブが停止されました')
-        db.update_job(job_id, progress=count, message=message, review_count=count)
-        db.append_log(job_id, message)
+            try:
+                job = db.get_job(job_id)
+                if job and job.get('status') in ('cancelled', JobStatus.cancelled):
+                    raise RuntimeError('ジョブが停止されました')
+            except RuntimeError:
+                raise
+            except Exception:
+                pass  # Firestore error shouldn't kill scraping
+        # Always update status (lightweight)
+        try:
+            db.update_job(job_id, progress=count, message=message, review_count=count)
+        except Exception:
+            pass
+        # Log every 3rd call to reduce Firestore writes
+        if _progress_counter[0] % 3 == 0 or 'エラー' in message or '完了' in message or '開始' in message or '検出' in message:
+            try:
+                db.append_log(job_id, message)
+            except Exception:
+                pass
 
     def on_reviews(batch: list[dict]):
         db.save_review_batch(job_id, batch)
