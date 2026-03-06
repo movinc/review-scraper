@@ -21,3 +21,9 @@
 ## デプロイ
 - デプロイ中もDiscordで返信可能にする（バックグラウンド実行、pollでブロックしない）
 - デプロイ確認は必ず事前に取る
+
+## disable_resources=True は使わない
+- Scraplingの`disable_resources=True`はfont/image/media/**stylesheet**を全部ブロックする
+- Google Maps: SPAがレンダリングできなくなる（タブ検出不能）
+- TripAdvisor: DOMレンダリングが変化し`<title>`タグ等が生成されない（パース全件失敗）
+- 画像だけブロックしたい場合は `page.route("**/*.{png,jpg,...}", route.abort)` で手動指定
