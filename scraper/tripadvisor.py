@@ -116,12 +116,26 @@ def scrape_tripadvisor_reviews(url: str, progress_callback=None, review_save_cal
                         break
 
                     new_batch = []
-                    for card in cards:
+                    parse_fails = 0
+                    for ci, card in enumerate(cards):
                         review = _parse_review_card(card)
                         if review:
                             all_reviews.append(review)
                             new_batch.append(review)
+                        else:
+                            parse_fails += 1
+                            # Debug: log what we found in this card
+                            try:
+                                card_html = card.inner_html()[:200] if hasattr(card, 'inner_html') else str(card)[:200]
+                                card_text = (card.text_content() or "")[:100] if hasattr(card, 'text_content') else ""
+                                if pcb:
+                                    pcb(len(all_reviews), f"パース失敗 card[{ci}]: text={card_text[:60]}... html_snippet={card_html[:80]}...")
+                            except Exception as dbg_e:
+                                if pcb:
+                                    pcb(len(all_reviews), f"パース失敗 card[{ci}]: デバッグ取得エラー: {dbg_e}")
                     new_count = len(new_batch)
+                    if pcb and parse_fails:
+                        pcb(len(all_reviews), f"パース結果: 成功{new_count} 失敗{parse_fails}/{len(cards)}")
 
                     if rsc and new_batch:
                         rsc(new_batch)
@@ -335,6 +349,8 @@ def _parse_review_card(card) -> dict | None:
 
     if not comment and not rating:
         return None
+    # Debug: log successful parse fields for verification
+    # (removed after debugging)
 
     return {
         "review_id": review_id, "author": author,
