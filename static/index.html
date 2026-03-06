@@ -341,13 +341,13 @@ function loadReviewsLocal(jid) { try{return JSON.parse(localStorage.getItem('rev
 function removeReviewsLocal(jid) { try{localStorage.removeItem('reviews_'+jid)}catch{} }
 
 function getHistory() { try{return JSON.parse(localStorage.getItem('scraper_history')||'[]')}catch{return []} }
-function setHistoryData(h) { localStorage.setItem('scraper_history',JSON.stringify(h.slice(0,50))); render(); restoreOpenPanels(); }
+function setHistoryData(h, skipRender) { localStorage.setItem('scraper_history',JSON.stringify(h.slice(0,50))); if (!skipRender) { render(); restoreOpenPanels(); } }
 function saveToHistory(jid,url,source) {
     const h=getHistory();
     h.unshift({jobId:jid,url,source,name:extractName(url),status:'running',count:0,message:'開始中...',time:new Date().toISOString(),duration:null,error:null});
     setHistoryData(h);
 }
-function updateHistory(jid,u) { const h=getHistory(); const i=h.find(x=>x.jobId===jid); if(i)Object.assign(i,u); setHistoryData(h); }
+function updateHistory(jid,u) { const h=getHistory(); const i=h.find(x=>x.jobId===jid); if(i)Object.assign(i,u); const skipRender = u.status === 'running'; setHistoryData(h, skipRender); }
 function removeHistory(jid) { removeReviewsLocal(jid); setHistoryData(getHistory().filter(x=>x.jobId!==jid)); fetch('/jobs/'+jid,{method:'DELETE'}).catch(()=>{}); }
 function clearHistory() { if(confirm('すべて削除しますか？')){getHistory().forEach(x=>{removeReviewsLocal(x.jobId);fetch('/jobs/'+x.jobId,{method:'DELETE'}).catch(()=>{});}); setHistoryData([]); } }
 
@@ -404,7 +404,7 @@ function render() {
         if (st==='done') actions+=` <button class="btn-ghost" onclick="event.stopPropagation();toggleResults('${item.jobId}')">📄 結果</button> <button class="btn-ghost btn-dl" onclick="event.stopPropagation();downloadCsv('${item.jobId}')">⬇ CSV</button> <button class="btn-ghost btn-dl" onclick="event.stopPropagation();downloadJson('${item.jobId}')">⬇ JSON</button>`;
         actions+=` <button class="btn-ghost" onclick="event.stopPropagation();toggleLogs('${item.jobId}')">🔍 ログ</button>`;
         actions+=` <button class="btn-ghost" onclick="event.stopPropagation();removeHistory('${item.jobId}')" style="color:var(--text-tertiary)">✕</button>`;
-        return `<div class="job-card"><div class="job-header" onclick="toggleResults('${item.jobId}')"><div class="job-row1"><div><span class="job-name">${si} ${esc(item.name||extractName(item.url))}</span><span class="job-source-tag">${sl}</span></div><span class="job-badge ${st}"><span class="dot"></span>${statusLabel(st)}</span></div><div class="job-row2">${stats}</div>${progress}${error}<div class="job-url" title="${esc(item.url)}">${esc(item.url)}</div><div class="job-meta">${actions}</div></div><div class="job-results" id="results-${item.jobId}"><div class="results-bar"><span class="chip">${item.count||0}件</span><div style="display:flex;gap:6px"><button class="btn-ghost btn-dl" onclick="downloadCsv('${item.jobId}')">⬇ CSV</button><button class="btn-ghost btn-dl" onclick="downloadJson('${item.jobId}')">⬇ JSON</button></div></div><div class="table-wrap"><table><thead><tr><th>投稿者</th><th>評価</th><th>日付</th><th>コメント</th></tr></thead><tbody></tbody></table></div></div><div class="job-logs" id="logs-${item.jobId}"></div></div>`;
+        return `<div class="job-card" data-job-id="${item.jobId}"><div class="job-header" onclick="toggleResults('${item.jobId}')"><div class="job-row1"><div><span class="job-name">${si} ${esc(item.name||extractName(item.url))}</span><span class="job-source-tag">${sl}</span></div><span class="job-badge ${st}"><span class="dot"></span>${statusLabel(st)}</span></div><div class="job-row2">${stats}</div>${progress}${error}<div class="job-url" title="${esc(item.url)}">${esc(item.url)}</div><div class="job-meta">${actions}</div></div><div class="job-results" id="results-${item.jobId}"><div class="results-bar"><span class="chip">${item.count||0}件</span><div style="display:flex;gap:6px"><button class="btn-ghost btn-dl" onclick="downloadCsv('${item.jobId}')">⬇ CSV</button><button class="btn-ghost btn-dl" onclick="downloadJson('${item.jobId}')">⬇ JSON</button></div></div><div class="table-wrap"><table><thead><tr><th>投稿者</th><th>評価</th><th>日付</th><th>コメント</th></tr></thead><tbody></tbody></table></div></div><div class="job-logs" id="logs-${item.jobId}"></div></div>`;
     }).join('');
 }
 
@@ -457,7 +457,25 @@ async function syncFromServer() {
 }
 
 syncFromServer();
-setInterval(()=>{ if(getHistory().some(x=>x.status==='running')) render(); }, 5000);
+setInterval(()=>{
+    // Update running jobs in-place without full re-render
+    const h = getHistory();
+    for (const item of h) {
+        if (item.status !== 'running') continue;
+        const card = document.querySelector('[data-job-id="'+item.jobId+'"]');
+        if (!card) { render(); return; }
+        const elapsed = formatDuration(Date.now()-new Date(item.time).getTime());
+        const statsEl = card.querySelector('.job-row2');
+        if (statsEl) {
+            let stats = '';
+            if (item.count > 0) stats += '<span class="job-stat">📝 '+item.count+'件</span>';
+            stats += '<span class="job-stat">⏱ '+elapsed+'経過</span>';
+            statsEl.innerHTML = stats;
+        }
+        const progEl = card.querySelector('.job-progress');
+        if (progEl && item.message) progEl.innerHTML = '<span class="spin"></span>'+esc(item.message);
+    }
+}, 5000);
 </script>
 </body>
 </html>
