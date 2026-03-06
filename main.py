@@ -7,6 +7,8 @@ from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from scraper.gmap import scrape_gmap_reviews
 from scraper.tripadvisor import scrape_tripadvisor_reviews
 
@@ -21,6 +23,11 @@ class Source(str, Enum):
 class ScrapeRequest(BaseModel):
     url: str
     source: Source
+
+
+@app.get("/")
+def index():
+    return FileResponse("static/index.html")
 
 
 @app.post("/scrape")

@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Review Scraper</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f5; color: #333; }
+        .container { max-width: 800px; margin: 0 auto; padding: 24px; }
+        h1 { font-size: 24px; margin-bottom: 8px; }
+        .subtitle { color: #666; margin-bottom: 24px; font-size: 14px; }
+        .form-card { background: #fff; border-radius: 12px; padding: 24px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); margin-bottom: 24px; }
+        label { display: block; font-weight: 600; margin-bottom: 6px; font-size: 14px; }
+        input[type="text"] { width: 100%; padding: 10px 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 14px; margin-bottom: 16px; }
+        input[type="text"]:focus { outline: none; border-color: #4285f4; box-shadow: 0 0 0 2px rgba(66,133,244,0.2); }
+        .source-row { display: flex; gap: 12px; margin-bottom: 16px; }
+        .source-btn { flex: 1; padding: 10px; border: 2px solid #ddd; border-radius: 8px; background: #fff; cursor: pointer; font-size: 14px; text-align: center; transition: all 0.2s; }
+        .source-btn.active { border-color: #4285f4; background: #e8f0fe; color: #1a73e8; }
+        .source-btn:hover { border-color: #999; }
+        .btn-row { display: flex; gap: 12px; }
+        button.primary { flex: 1; padding: 12px; background: #1a73e8; color: #fff; border: none; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; }
+        button.primary:hover { background: #1557b0; }
+        button.primary:disabled { background: #ccc; cursor: not-allowed; }
+        button.secondary { padding: 12px 20px; background: #fff; color: #1a73e8; border: 2px solid #1a73e8; border-radius: 8px; font-size: 15px; font-weight: 600; cursor: pointer; }
+        button.secondary:disabled { opacity: 0.5; cursor: not-allowed; }
+        .status { padding: 12px 16px; border-radius: 8px; margin-bottom: 16px; font-size: 14px; display: none; }
+        .status.loading { display: block; background: #fff3cd; color: #856404; }
+        .status.error { display: block; background: #f8d7da; color: #721c24; }
+        .status.success { display: block; background: #d4edda; color: #155724; }
+        .results { background: #fff; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); overflow: hidden; display: none; }
+        .results-header { padding: 16px 24px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; }
+        .results-header h2 { font-size: 16px; }
+        .results-count { background: #e8f0fe; color: #1a73e8; padding: 4px 12px; border-radius: 16px; font-size: 13px; font-weight: 600; }
+        table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        th { background: #f8f9fa; padding: 10px 12px; text-align: left; font-weight: 600; border-bottom: 2px solid #dee2e6; position: sticky; top: 0; }
+        td { padding: 10px 12px; border-bottom: 1px solid #eee; vertical-align: top; }
+        td.comment { max-width: 350px; white-space: pre-wrap; word-break: break-word; }
+        tr:hover { background: #f8f9fa; }
+        .table-wrap { max-height: 500px; overflow-y: auto; }
+        .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid #856404; border-top-color: transparent; border-radius: 50%; animation: spin 0.8s linear infinite; margin-right: 8px; vertical-align: middle; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Review Scraper</h1>
+        <p class="subtitle">Google Maps・TripAdvisor の口コミを取得</p>
+        <div class="form-card">
+            <label>URL</label>
+            <input type="text" id="url" placeholder="Google Maps または TripAdvisor のURLを貼り付け">
+            <label>ソース</label>
+            <div class="source-row">
+                <div class="source-btn active" data-source="gmap" onclick="selectSource(this)">📍 Google Maps</div>
+                <div class="source-btn" data-source="tripadvisor" onclick="selectSource(this)">🦉 TripAdvisor</div>
+            </div>
+            <div class="btn-row">
+                <button class="primary" id="scrapeBtn" onclick="scrape()">口コミを取得</button>
+                <button class="secondary" id="csvBtn" onclick="downloadCsv()" disabled>📥 CSV</button>
+            </div>
+        </div>
+        <div class="status" id="status"></div>
+        <div class="results" id="results">
+            <div class="results-header">
+                <h2>取得結果</h2>
+                <span class="results-count" id="count"></span>
+            </div>
+            <div class="table-wrap">
+                <table>
+                    <thead><tr><th>投稿者</th><th>Rating</th><th>投稿日</th><th>コメント</th></tr></thead>
+                    <tbody id="tbody"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <script>
+        let currentSource = 'gmap', lastReviews = [];
+        function selectSource(el) {
+            document.querySelectorAll('.source-btn').forEach(b => b.classList.remove('active'));
+            el.classList.add('active');
+            currentSource = el.dataset.source;
+        }
+        function setStatus(type, msg) {
+            const s = document.getElementById('status');
+            s.className = 'status ' + type;
+            s.innerHTML = msg;
+        }
+        async function scrape() {
+            const url = document.getElementById('url').value.trim();
+            if (!url) { setStatus('error', 'URLを入力してください'); return; }
+            const btn = document.getElementById('scrapeBtn');
+            btn.disabled = true; btn.textContent = '取得中...';
+            setStatus('loading', '<span class="spinner"></span>口コミを取得中です（数分かかる場合があります）');
+            document.getElementById('results').style.display = 'none';
+            document.getElementById('csvBtn').disabled = true;
+            try {
+                const res = await fetch('/scrape', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ url, source: currentSource })
+                });
+                const data = await res.json();
+                if (data.error) { setStatus('error', data.error); return; }
+                lastReviews = data;
+                document.getElementById('count').textContent = data.length + '件';
+                document.getElementById('tbody').innerHTML = data.map(r =>
+                    '<tr><td>'+esc(r.author)+'</td><td>'+esc(r.rating)+'</td><td>'+esc(r.date)+'</td><td class="comment">'+esc(r.comment)+'</td></tr>'
+                ).join('');
+                document.getElementById('results').style.display = 'block';
+                document.getElementById('csvBtn').disabled = false;
+                setStatus('success', '✅ ' + data.length + '件の口コミを取得しました');
+            } catch (e) { setStatus('error', 'エラー: ' + e.message); }
+            finally { btn.disabled = false; btn.textContent = '口コミを取得'; }
+        }
+        function downloadCsv() {
+            if (!lastReviews.length) return;
+            const rows = lastReviews.map(r =>
+                [r.review_id,r.author,r.rating,r.date,r.comment].map(v=>'"'+(v||'').replace(/"/g,'""')+'"').join(',')
+            );
+            const blob = new Blob(['\uFEFF'+'review_id,投稿者,Rating,投稿日,コメント\n'+rows.join('\n')], {type:'text/csv'});
+            const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = 'reviews.csv'; a.click();
+        }
+        function esc(s) { return s ? s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;') : ''; }
+        document.getElementById('url').addEventListener('input', function() {
+            if (this.value.includes('tripadvisor')) { selectSource(document.querySelector('[data-source="tripadvisor"]')); }
+            else if (this.value.includes('google.com/maps') || this.value.includes('goo.gl')) { selectSource(document.querySelector('[data-source="gmap"]')); }
+        });
+    </script>
+</body>
+</html>
