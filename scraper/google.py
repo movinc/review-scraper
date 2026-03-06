@@ -544,6 +544,8 @@ def _collect_all_reviews(
             break
         time.sleep(GOOGLE_SCROLL_INTERVAL)
 
+        elapsed = int(time.time() - last_new_time)
+
         if time.time() - last_new_time > GOOGLE_STALL_SECONDS:
             # スクロール停止 → 取れた分で完了（部分成功）
             if progress_callback:
@@ -554,23 +556,27 @@ def _collect_all_reviews(
                 review_save_callback(final)
             break
 
+        # DOM抽出は3回ごと（パフォーマンス）、進捗表示は毎回
         if i % 3 == 2:
             new = _extract_reviews_from_dom(page, saved_ids)
             all_reviews.extend(new)
             if review_save_callback and new:
                 review_save_callback(new)
             _cleanup_heavy_elements(page)
-            if progress_callback:
-                elapsed = int(time.time() - last_new_time)
-                if new:
-                    progress_callback(len(all_reviews), f"スクロール中... {len(all_reviews)}件取得 (scroll {i+1})")
-                else:
-                    progress_callback(len(all_reviews), f"スクロール中... {len(all_reviews)}件 (新規なし {elapsed}秒, scroll {i+1})")
             if len(new) == 0:
                 no_new += 1
             else:
                 no_new = 0
                 last_new_time = time.time()
+                elapsed = 0
+
+        # 毎スクロール進捗更新
+        if progress_callback:
+            if elapsed > 0:
+                remaining = max(0, GOOGLE_STALL_SECONDS - elapsed)
+                progress_callback(len(all_reviews), f"スクロール中... {len(all_reviews)}件 (新規なし {elapsed}秒/{GOOGLE_STALL_SECONDS}秒, scroll {i+1})")
+            else:
+                progress_callback(len(all_reviews), f"スクロール中... {len(all_reviews)}件取得 (scroll {i+1})")
 
         if no_new >= GOOGLE_NO_NEW_THRESHOLD:
             final = _extract_reviews_from_dom(page, saved_ids)

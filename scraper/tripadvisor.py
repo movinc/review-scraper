@@ -143,6 +143,7 @@ def scrape_tripadvisor_reviews(url: str, progress_callback=None, review_save_cal
                     pcb(0, f"ページURL: {actual_url[:100]}")
 
                 all_reviews = []
+                seen_ids = set()
                 page_num = 0
 
                 while True:
@@ -168,6 +169,11 @@ def scrape_tripadvisor_reviews(url: str, progress_callback=None, review_save_cal
                     for ci, card in enumerate(cards):
                         review = _parse_review_card(card)
                         if review:
+                            rid = review.get('review_id', '')
+                            key = rid or f"{review['author']}_{review['comment'][:30]}"
+                            if key in seen_ids:
+                                continue
+                            seen_ids.add(key)
                             all_reviews.append(review)
                             new_batch.append(review)
                         else:
