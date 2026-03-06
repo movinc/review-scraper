@@ -26,13 +26,7 @@ def _resolve_url(url: str) -> str:
         except Exception:
             pass
 
-    # Validate URL has coordinates (@lat,lng)
-    if "/maps/place/" in url and "/@" not in url:
-        raise ValueError(
-            "URLに座標情報がありません。Google Mapsで店舗ページを開き、"
-            "口コミタブをクリックした状態のURLを使用してください。"
-            "または maps.app.goo.gl の短縮URLを使ってください。"
-        )
+
 
     return url
 
