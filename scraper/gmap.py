@@ -85,7 +85,8 @@ def scrape_gmap_reviews(url: str, progress_callback=None) -> list[dict]:
     session = None
     try:
         page, session = _start_session(url, progress_callback)
-        return _collect_all_reviews(page, progress_callback)
+        reviews = _collect_all_reviews(page, progress_callback)
+        return reviews
     finally:
         if session:
             try:
@@ -94,7 +95,7 @@ def scrape_gmap_reviews(url: str, progress_callback=None) -> list[dict]:
                 pass
 
 
-PROFILE_DIR = "/tmp/gmap-browser-profile"
+PROFILE_BASE = "/tmp/gmap-profiles"
 
 
 REQUIRED_COOKIES = {"AEC", "NID"}  # Minimum cookies needed for reviews tab
@@ -188,19 +189,25 @@ def _sort_by_newest(page):
 
 def _start_session(url: str, progress_callback=None):
     """Start a StealthySession and navigate to the URL with retries."""
-    import os
-    os.makedirs(PROFILE_DIR, exist_ok=True)
+    import os, uuid
+    profile_dir = os.path.join(PROFILE_BASE, uuid.uuid4().hex[:8])
+    os.makedirs(profile_dir, exist_ok=True)
 
     last_error = ""
     for retry in range(5):
         if progress_callback:
             progress_callback(0, f"セッション開始中... (試行 {retry + 1}/5)")
 
+        # Remove stale SingletonLock if exists
+        lock_file = os.path.join(profile_dir, "SingletonLock")
+        if os.path.exists(lock_file):
+            os.remove(lock_file)
+
         try:
             session = StealthySession(
                 headless=True,
                 locale="ja-JP",
-                user_data_dir=PROFILE_DIR,
+                user_data_dir=profile_dir,
             )
             session.start()
         except Exception as e:
@@ -236,8 +243,9 @@ def _start_session(url: str, progress_callback=None):
                 pass
             # Delete profile and retry with fresh cookies
             import shutil
-            shutil.rmtree(PROFILE_DIR, ignore_errors=True)
-            os.makedirs(PROFILE_DIR, exist_ok=True)
+            shutil.rmtree(profile_dir, ignore_errors=True)
+            profile_dir = os.path.join(PROFILE_BASE, uuid.uuid4().hex[:8])
+            os.makedirs(profile_dir, exist_ok=True)
             time.sleep(2)
             continue
 
@@ -278,8 +286,9 @@ def _start_session(url: str, progress_callback=None):
             except Exception:
                 pass
             import shutil
-            shutil.rmtree(PROFILE_DIR, ignore_errors=True)
-            os.makedirs(PROFILE_DIR, exist_ok=True)
+            shutil.rmtree(profile_dir, ignore_errors=True)
+            profile_dir = os.path.join(PROFILE_BASE, uuid.uuid4().hex[:8])
+            os.makedirs(profile_dir, exist_ok=True)
             time.sleep(5)
             continue
 
