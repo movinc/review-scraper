@@ -172,7 +172,7 @@ def _click_reviews_tab(page):
         text = (tab.text_content() or "").strip()
         if "クチコミ" in text or "口コミ" in text or "review" in text.lower():
             tab.click()
-            time.sleep(5)
+            time.sleep(2)
             return True
 
     # Fallback: click element with aria-label containing クチコミ
@@ -188,7 +188,7 @@ def _click_reviews_tab(page):
         return false;
     }""")
     if clicked:
-        time.sleep(5)
+        time.sleep(2)
     return clicked
 
 
@@ -284,7 +284,7 @@ def _start_session(url: str, progress_callback=None):
         try:
             referer = generate_convincing_referer(url)
             page.goto(
-                url, referer=referer, wait_until="networkidle", timeout=120000
+                url, referer=referer, wait_until="networkidle", timeout=60000
             )
         except Exception as e:
             last_error = f"ページ読み込み失敗: {e}"
