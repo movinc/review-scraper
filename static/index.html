@@ -82,6 +82,8 @@ body::before{content:'';position:fixed;top:-50%;left:-50%;width:200%;height:200%
 .job-meta{display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap}
 .btn-ghost{display:inline-flex;align-items:center;gap:4px;padding:5px 12px;border-radius:var(--radius-xs);font-size:12px;font-weight:600;background:var(--bg);border:1px solid var(--border);color:var(--text-secondary);cursor:pointer;font-family:inherit;transition:all var(--transition)}
 .btn-ghost:hover{background:var(--surface2);border-color:var(--text-tertiary);color:var(--text)}
+.btn-dl{background:var(--surface2);border-color:var(--accent);color:var(--accent2)}
+.btn-dl:hover{background:var(--accent-glow);border-color:var(--accent2)}
 
 /* Expandable panels */
 .job-results,.job-logs{display:none}.job-results.open,.job-logs.open{display:block}
@@ -399,10 +401,10 @@ function render() {
         let error='';
         if (st==='failed'&&item.error) error=`<div class="job-error">⚠️ ${esc(item.error)}</div>`;
         let actions=`<span style="color:var(--text-tertiary);font-size:12px">${ds}</span>`;
-        if (st==='done') actions+=` <button class="btn-ghost" onclick="event.stopPropagation();toggleResults('${item.jobId}')">📄 結果</button> <button class="btn-ghost" onclick="event.stopPropagation();downloadCsv('${item.jobId}')">📥 CSV</button> <button class="btn-ghost" onclick="event.stopPropagation();downloadJson('${item.jobId}')">📋 JSON</button>`;
+        if (st==='done') actions+=` <button class="btn-ghost" onclick="event.stopPropagation();toggleResults('${item.jobId}')">📄 結果</button> <button class="btn-ghost btn-dl" onclick="event.stopPropagation();downloadCsv('${item.jobId}')">⬇ CSV</button> <button class="btn-ghost btn-dl" onclick="event.stopPropagation();downloadJson('${item.jobId}')">⬇ JSON</button>`;
         actions+=` <button class="btn-ghost" onclick="event.stopPropagation();toggleLogs('${item.jobId}')">🔍 ログ</button>`;
         actions+=` <button class="btn-ghost" onclick="event.stopPropagation();removeHistory('${item.jobId}')" style="color:var(--text-tertiary)">✕</button>`;
-        return `<div class="job-card"><div class="job-header" onclick="toggleResults('${item.jobId}')"><div class="job-row1"><div><span class="job-name">${si} ${esc(item.name||extractName(item.url))}</span><span class="job-source-tag">${sl}</span></div><span class="job-badge ${st}"><span class="dot"></span>${statusLabel(st)}</span></div><div class="job-row2">${stats}</div>${progress}${error}<div class="job-url" title="${esc(item.url)}">${esc(item.url)}</div><div class="job-meta">${actions}</div></div><div class="job-results" id="results-${item.jobId}"><div class="results-bar"><span class="chip">${item.count||0}件</span><div style="display:flex;gap:6px"><button class="btn-ghost" onclick="downloadCsv('${item.jobId}')">📥 CSV</button><button class="btn-ghost" onclick="downloadJson('${item.jobId}')">📋 JSON</button></div></div><div class="table-wrap"><table><thead><tr><th>投稿者</th><th>評価</th><th>日付</th><th>コメント</th></tr></thead><tbody></tbody></table></div></div><div class="job-logs" id="logs-${item.jobId}"></div></div>`;
+        return `<div class="job-card"><div class="job-header" onclick="toggleResults('${item.jobId}')"><div class="job-row1"><div><span class="job-name">${si} ${esc(item.name||extractName(item.url))}</span><span class="job-source-tag">${sl}</span></div><span class="job-badge ${st}"><span class="dot"></span>${statusLabel(st)}</span></div><div class="job-row2">${stats}</div>${progress}${error}<div class="job-url" title="${esc(item.url)}">${esc(item.url)}</div><div class="job-meta">${actions}</div></div><div class="job-results" id="results-${item.jobId}"><div class="results-bar"><span class="chip">${item.count||0}件</span><div style="display:flex;gap:6px"><button class="btn-ghost btn-dl" onclick="downloadCsv('${item.jobId}')">⬇ CSV</button><button class="btn-ghost btn-dl" onclick="downloadJson('${item.jobId}')">⬇ JSON</button></div></div><div class="table-wrap"><table><thead><tr><th>投稿者</th><th>評価</th><th>日付</th><th>コメント</th></tr></thead><tbody></tbody></table></div></div><div class="job-logs" id="logs-${item.jobId}"></div></div>`;
     }).join('');
 }
 
