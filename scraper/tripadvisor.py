@@ -114,12 +114,16 @@ def scrape_tripadvisor_reviews(url: str, progress_callback=None, review_save_cal
                             pcb(len(all_reviews), f"ページ{page_num + 1}: カードなし、終了")
                         break
 
-                    new_count = 0
+                    new_batch = []
                     for card in cards:
                         review = _parse_review_card(card)
                         if review:
                             all_reviews.append(review)
-                            new_count += 1
+                            new_batch.append(review)
+                    new_count = len(new_batch)
+
+                    if rsc and new_batch:
+                        rsc(new_batch)
 
                     if pcb:
                         pcb(len(all_reviews), f"ページ{page_num + 1}: {new_count}件取得 (合計{len(all_reviews)}件)")

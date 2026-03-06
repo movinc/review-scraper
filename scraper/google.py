@@ -408,6 +408,8 @@ def _collect_all_reviews(page, progress_callback=None, review_save_callback=None
     all_reviews.extend(_extract_reviews_from_dom(page, saved_ids))
     if progress_callback:
         progress_callback(len(all_reviews), f"初期読み込み: {len(all_reviews)}件")
+    if review_save_callback and all_reviews:
+        review_save_callback(all_reviews)
 
     no_new = 0
     last_new_time = time.time()
@@ -425,6 +427,8 @@ def _collect_all_reviews(page, progress_callback=None, review_save_callback=None
         if i % 3 == 2:
             new = _extract_reviews_from_dom(page, saved_ids)
             all_reviews.extend(new)
+            if review_save_callback and new:
+                review_save_callback(new)
             _cleanup_heavy_elements(page)
             if progress_callback:
                 if new:
