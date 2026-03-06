@@ -205,8 +205,9 @@ def _parse_review_card(card) -> dict | None:
     # Author
     author = ""
     for sel in [
-        "a.BMQDV", "a.ui_header_link", "span.biGQs._P.fiohW.fOtGX",
-        "a[onclick*='member']", "[class*='username']", "a[href*='/Profile/']",
+        "a.BMQDV.ukgoS", "a.BMQDV:not([aria-hidden])", "span.biGQs._P.ezezH a",
+        "a.ui_header_link", "span.biGQs._P.fiohW.fOtGX",
+        "a[href*='/Profile/']:not([aria-hidden])", "[class*='username']",
     ]:
         try:
             el = card.query_selector(sel)
