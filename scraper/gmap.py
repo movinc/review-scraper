@@ -1,5 +1,6 @@
 """Google Maps review scraper using Scrapling StealthySession."""
 from scrapling.fetchers import StealthySession
+from utils.date_parser import parse_japanese_date
 from scrapling.engines.toolbelt.fingerprints import generate_convincing_referer
 import time
 import subprocess
@@ -394,7 +395,8 @@ def _extract_reviews_from_dom(page, saved_ids: set) -> list[dict]:
             import re
             m = re.search(r'(\d)', raw_rating)
             rating = m.group(1) if m else raw_rating
-            date = (date_el.text_content() or "").strip() if date_el else ""
+            raw_date = (date_el.text_content() or "").strip() if date_el else ""
+            date = parse_japanese_date(raw_date)
             comment = (text_el.text_content() or "").strip() if text_el else ""
 
             if comment or rating:

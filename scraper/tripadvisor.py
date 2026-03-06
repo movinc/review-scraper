@@ -5,6 +5,7 @@ StealthyFetcher's browserforge fingerprints allow bypassing DataDome,
 while page_action gives us direct Playwright page control for navigation.
 """
 from scrapling.fetchers import StealthyFetcher
+from utils.date_parser import parse_japanese_date
 import re
 import time
 
