@@ -31,6 +31,11 @@ def cleanup_stale_jobs():
                 pass
 
 
+@app.get("/favicon.svg")
+def favicon():
+    return FileResponse("static/favicon.svg", media_type="image/svg+xml")
+
+
 @app.get("/")
 def index():
     return FileResponse("static/index.html")
