@@ -229,8 +229,12 @@ def _start_session(url: str, progress_callback=None, proxy: str | None = None):
             )
             if effective_proxy:
                 session_kwargs["proxy"] = {"server": effective_proxy}
+            if progress_callback:
+                progress_callback(0, f"Session kwargs: headless={session_kwargs.get('headless')}, hide_canvas={session_kwargs.get('hide_canvas')}, block_webrtc={session_kwargs.get('block_webrtc')}")
             session = StealthySession(**session_kwargs)
             session.start()
+            if progress_callback:
+                progress_callback(0, "ブラウザ起動完了")
         except Exception as e:
             last_error = f"セッション起動失敗: {e}"
             if progress_callback:
@@ -256,7 +260,7 @@ def _start_session(url: str, progress_callback=None, proxy: str | None = None):
         if not cookies_ok:
             check = _check_cookies(session)
             if progress_callback:
-                progress_callback(0, f"Cookie不足 (missing: {check['missing']})、Cookie無しでページ読み込みを試行...")
+                progress_callback(0, f"Cookie不足 (missing: {check['missing']}, present: {check['present']}, all: {check['all_google']})")
         else:
             if progress_callback:
                 progress_callback(0, "Cookie OK、ページ読み込み中...")
