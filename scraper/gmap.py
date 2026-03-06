@@ -236,21 +236,11 @@ def _start_session(url: str, progress_callback=None):
         if not cookies_ok:
             check = _check_cookies(session)
             if progress_callback:
-                progress_callback(0, f"Cookie不足 (missing: {check['missing']})、プロファイル再作成してリトライ...")
-            try:
-                session.close()
-            except Exception:
-                pass
-            # Delete profile and retry with fresh cookies
-            import shutil
-            shutil.rmtree(profile_dir, ignore_errors=True)
-            profile_dir = os.path.join(PROFILE_BASE, uuid.uuid4().hex[:8])
-            os.makedirs(profile_dir, exist_ok=True)
-            time.sleep(2)
-            continue
-
-        if progress_callback:
-            progress_callback(0, "Cookie OK、ページ読み込み中...")
+                progress_callback(0, f"Cookie不足 (missing: {check['missing']})、Cookie無しでページ読み込みを試行...")
+            # Don't bail out - try loading the page anyway (Cloud Run IPs may not get all cookies)
+        else:
+            if progress_callback:
+                progress_callback(0, "Cookie OK、ページ読み込み中...")
 
         # Resolve share.google URLs in browser (JS redirect)
         url = _resolve_share_url_in_browser(page, url)
