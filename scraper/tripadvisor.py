@@ -89,8 +89,14 @@ def _parse_review_card(card) -> dict | None:
                 break
 
     # Author
-    author_el = card.css("a.BMQDV")
-    author = (author_el[0].text or "").strip() if author_el else ""
+    # Try multiple selectors for author (TripAdvisor changes frequently)
+    author = ""
+    for sel in ["a.BMQDV", "a.ui_header_link", "span.biGQs._P.fiohW.fOtGX", "a[onclick*='member']", "[class*='username']", "a[href*='/Profile/']"]:
+        author_el = card.css(sel)
+        if author_el:
+            author = (author_el[0].text or "").strip()
+            if author:
+                break
 
     # Rating
     rating = ""
