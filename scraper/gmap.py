@@ -421,7 +421,7 @@ def _collect_all_reviews(page, progress_callback=None) -> list[dict]:
                 no_new = 0
 
         # 20 consecutive rounds with no new reviews -> done
-        if no_new >= 20:
+        if no_new >= 5:
             final = _extract_reviews_from_dom(page, saved_ids)
             all_reviews.extend(final)
             break
