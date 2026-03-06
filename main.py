@@ -103,6 +103,19 @@ def get_job_reviews(job_id: str):
 
 
 
+
+
+@app.post("/admin/flush-instances")
+async def flush_instances():
+    """全runningジョブを停止し、旧インスタンスを解放する。"""
+    flushed = []
+    for job in db.list_jobs():
+        if job.get("status") in ("running", JobStatus.running):
+            db.update_job(job["job_id"], status=JobStatus.cancelled, message="インスタンスフラッシュにより停止")
+            db.append_log(job["job_id"], "インスタンスフラッシュにより停止")
+            flushed.append(job["job_id"])
+    return JSONResponse(content={"ok": True, "flushed": flushed, "count": len(flushed)})
+
 @app.post("/jobs/{job_id}/retry")
 async def retry_job(job_id: str):
     """Internal: re-run a failed job on a new instance (same job_id)."""
