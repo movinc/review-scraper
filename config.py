@@ -15,7 +15,7 @@ GOOGLE_SCROLL_INTERVAL_MIN = 1.5   # ランダムスクロール間隔（秒）
 GOOGLE_SCROLL_INTERVAL_MAX = 2.5
 GOOGLE_WARMUP_DELAY_MIN = 2.0     # warm-up間のランダム遅延（秒）
 GOOGLE_WARMUP_DELAY_MAX = 5.0
-GOOGLE_STALL_SECONDS = 60       # No new reviews for this long → finish
+GOOGLE_STALL_SECONDS = 120       # No new reviews for this long → finish
 GOOGLE_NO_NEW_THRESHOLD = 5     # Consecutive empty scroll rounds → finish
 GOOGLE_MAX_SCROLLS = 2000
 

@@ -700,6 +700,50 @@ def _collect_all_reviews(
             _cleanup_heavy_elements(page)
             if len(new) == 0:
                 no_new += 1
+                # 新規なしが2回連続 → スクロールリカバリ（上に戻して再度下）
+                if no_new == 2:
+                    try:
+                        page.evaluate("""() => {
+                            const el = document.querySelector('div.m6QErb.DxyBCb');
+                            if (el) {
+                                // 上に300px戻す
+                                el.scrollTop -= 300;
+                            }
+                        }""")
+                        time.sleep(1)
+                        page.evaluate("""() => {
+                            const el = document.querySelector('div.m6QErb.DxyBCb');
+                            if (el) {
+                                // 再度最下部へ
+                                el.scrollTop = el.scrollHeight;
+                            }
+                        }""")
+                        time.sleep(2)
+                        if progress_callback:
+                            progress_callback(len(all_reviews), f"スクロールリカバリ実行（上戻し→再下降）")
+                    except Exception:
+                        pass
+                # 新規なしが4回連続 → 大きく上に戻す
+                elif no_new == 4:
+                    try:
+                        page.evaluate("""() => {
+                            const el = document.querySelector('div.m6QErb.DxyBCb');
+                            if (el) {
+                                el.scrollTop = Math.max(0, el.scrollTop - 2000);
+                            }
+                        }""")
+                        time.sleep(2)
+                        page.evaluate("""() => {
+                            const el = document.querySelector('div.m6QErb.DxyBCb');
+                            if (el) {
+                                el.scrollTop = el.scrollHeight;
+                            }
+                        }""")
+                        time.sleep(3)
+                        if progress_callback:
+                            progress_callback(len(all_reviews), f"大幅スクロールリカバリ実行（-2000px→最下部）")
+                    except Exception:
+                        pass
             else:
                 no_new = 0
                 last_new_time = time.time()
