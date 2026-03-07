@@ -211,40 +211,47 @@ async def _run_scrape(job_id: str, url: str, source: Source):
     def on_reviews(batch: list[dict]):
         db.save_review_batch(job_id, batch)
 
-    try:
-        scraper = scrape_google_reviews if source == Source.google else scrape_tripadvisor_reviews
-        reviews = await asyncio.wait_for(
-            asyncio.to_thread(scraper, url, on_progress, on_reviews),
-            timeout=JOB_TIMEOUT_SECONDS,
-        )
-        db.update_job(job_id, status=JobStatus.done, progress=len(reviews),
-                      duration=int(_time.time() - start),
-                      message=f"完了: {len(reviews)}件取得")
-    except asyncio.TimeoutError:
-        db.update_job(job_id, status=JobStatus.failed,
-                      error=f"{JOB_TIMEOUT_SECONDS // 60}分タイムアウト",
-                      duration=int(_time.time() - start),
-                      message=f"{JOB_TIMEOUT_SECONDS // 60}分タイムアウトで終了")
-        db.append_log(job_id, f"{JOB_TIMEOUT_SECONDS // 60}分タイムアウトで強制終了")
-    except Exception as e:
-        duration = int(_time.time() - start)
-        db.update_job(job_id, status=JobStatus.failed, error=str(e),
+    MAX_OUTER_RETRIES = 3
+    scraper = scrape_google_reviews if source == Source.google else scrape_tripadvisor_reviews
+    last_error: Exception | None = None
+
+    for attempt in range(MAX_OUTER_RETRIES):
+        if attempt > 0:
+            db.update_job(job_id, status=JobStatus.running,
+                          message=f"リトライ中... ({attempt}/{MAX_OUTER_RETRIES - 1})")
+            db.append_log(job_id, f"リトライ {attempt}/{MAX_OUTER_RETRIES - 1} (前回: {str(last_error)[:80]})")
+        try:
+            reviews = await asyncio.wait_for(
+                asyncio.to_thread(scraper, url, on_progress, on_reviews),
+                timeout=JOB_TIMEOUT_SECONDS,
+            )
+            if reviews:
+                db.update_job(job_id, status=JobStatus.done, progress=len(reviews),
+                              duration=int(_time.time() - start),
+                              message=f"完了: {len(reviews)}件取得")
+                return
+            # 0件 → リトライ
+            last_error = None
+            db.append_log(job_id, f"0件取得（attempt {attempt + 1}）、リトライします")
+        except asyncio.TimeoutError:
+            db.update_job(job_id, status=JobStatus.failed,
+                          error=f"{JOB_TIMEOUT_SECONDS // 60}分タイムアウト",
+                          duration=int(_time.time() - start),
+                          message=f"{JOB_TIMEOUT_SECONDS // 60}分タイムアウトで終了")
+            db.append_log(job_id, f"{JOB_TIMEOUT_SECONDS // 60}分タイムアウトで強制終了")
+            return  # タイムアウトはリトライしない
+        except Exception as e:
+            last_error = e
+            db.append_log(job_id, f"エラー (attempt {attempt + 1}): {str(e)[:120]}")
+
+    # 全リトライ失敗
+    duration = int(_time.time() - start)
+    if last_error is not None:
+        db.update_job(job_id, status=JobStatus.failed, error=str(last_error),
                       duration=duration,
-                      message=f"エラー: {e}")
-        # 失敗時にインスタンス切り替えリトライ（同じjob_id、最大1回）
-        job = db.get_job(job_id)
-        retry_count = job.get("retry_count", 0) if job else 0
-        if retry_count < 2:
-            try:
-                import httpx, os
-                db.update_job(job_id, status=JobStatus.running, retry_count=retry_count + 1,
-                              message=f"インスタンス切替リトライ中...")
-                db.append_log(job_id, f"インスタンス切替リトライ (失敗理由: {str(e)[:80]})")
-                port = os.environ.get("PORT", "8080")
-                # Self-call to get a new instance (concurrency=1)
-                httpx.post(f"http://localhost:{port}/jobs/{job_id}/retry",
-                           json={"url": url, "source": source.value},
-                           timeout=5.0)
-            except Exception as retry_err:
-                db.append_log(job_id, f"リトライ失敗: {retry_err}")
-                db.update_job(job_id, status=JobStatus.failed)
+                      message=f"エラー: {last_error}")
+    else:
+        # 全attempt 0件
+        db.update_job(job_id, status=JobStatus.done, progress=0,
+                      duration=duration,
+                      message="完了: 0件取得")
