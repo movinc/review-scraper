@@ -158,14 +158,14 @@ def _warm_up_session(page, session):
         if not check["missing"]:
             return True
 
-        page.goto("https://www.google.co.jp/", wait_until="networkidle", timeout=GOOGLE_WARMUP_TIMEOUT_MS)
+        page.goto("https://www.google.co.jp/", wait_until="domcontentloaded", timeout=GOOGLE_WARMUP_TIMEOUT_MS)
         time.sleep(random.uniform(GOOGLE_WARMUP_DELAY_MIN, GOOGLE_WARMUP_DELAY_MAX))
-        page.goto("https://www.google.com/maps", wait_until="networkidle", timeout=GOOGLE_WARMUP_TIMEOUT_MS)
+        page.goto("https://www.google.com/maps", wait_until="domcontentloaded", timeout=GOOGLE_WARMUP_TIMEOUT_MS)
         time.sleep(random.uniform(GOOGLE_WARMUP_DELAY_MIN, GOOGLE_WARMUP_DELAY_MAX))
 
         check = _check_cookies(session)
         if check["missing"]:
-            page.goto("https://www.google.co.jp/search?q=maps", wait_until="networkidle", timeout=GOOGLE_WARMUP_TIMEOUT_MS)
+            page.goto("https://www.google.co.jp/search?q=maps", wait_until="domcontentloaded", timeout=GOOGLE_WARMUP_TIMEOUT_MS)
             time.sleep(random.uniform(GOOGLE_WARMUP_DELAY_MIN, GOOGLE_WARMUP_DELAY_MAX))
             check = _check_cookies(session)
 
@@ -284,7 +284,7 @@ def _start_session(url: str, progress_callback=None, proxy: str | None = None):
             # session.start()はメインスレッドで実行（greenletスレッド親和性の制約回避）
             _timed_out = [False]
             def _watchdog():
-                time.sleep(60)
+                time.sleep(120)  # 120秒: 起動+warm-up+gotoをカバー
                 _timed_out[0] = True
                 try:
                     session.close()
@@ -329,8 +329,11 @@ def _start_session(url: str, progress_callback=None, proxy: str | None = None):
         )
 
         if progress_callback:
-            progress_callback(0, "Cookie取得中...")
+            progress_callback(0, "Cookie取得中（warm-up）...")
+        warmup_start = time.time()
         cookies_ok = _warm_up_session(page, session)
+        if progress_callback:
+            progress_callback(0, f"Cookie取得完了 ({int(time.time()-warmup_start)}秒)")
         if not cookies_ok:
             check = _check_cookies(session)
             if progress_callback:
