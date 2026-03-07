@@ -427,9 +427,12 @@ function startPoll(id){if(polls[id])clearInterval(polls[id]);polls[id]=setInterv
 async function pollJob(id){
   try{const r=await fetch('/jobs/'+id);const d=await r.json();const j=jobs.find(x=>x.id===id);if(!j)return;
   j.status=d.status;j.count=d.review_count||0;j.message=d.message||'';j.error=d.error||null;j.duration=d.duration||null;j.last_screenshot=d.last_screenshot||null;j.instance=d.instance||null;
+  const prevStatus=j._prevStatus||j.status;
+  j._prevStatus=d.status;
   if(d.status==='running'||d.status==='queued'){
-    patchRunning(id,j);
-    // Auto-refresh logs if open
+    // ステータスが変わったらカード全体をリビルド
+    if(prevStatus!==d.status){render();startPoll(id)}
+    else{patchRunning(id,j)}
     if(openPanels[id]==='logs')loadLogs(id);
   }else{
     clearInterval(polls[id]);delete polls[id];render()
