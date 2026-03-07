@@ -232,7 +232,11 @@ def _sort_by_newest(page, progress_callback=None):
         }""")
         time.sleep(3)
         if progress_callback:
-            progress_callback(0, "新しい順にソート完了")
+            gyazo_url = upload_screenshot(page, "Google Maps - sorted by newest")
+            msg = "新しい順にソート完了"
+            if gyazo_url:
+                msg += f" 📸 {gyazo_url}"
+            progress_callback(0, msg)
     except Exception:
         pass
 
@@ -398,7 +402,11 @@ def _start_session(url: str, progress_callback=None, proxy: str | None = None):
             progress_callback(0, f"クチコミタブをクリック中... ({len(tab_names)}個: {', '.join(tab_names)})")
         clicked = _click_reviews_tab(page)
         if progress_callback:
-            progress_callback(0, f"タブクリック {'成功' if clicked else '失敗'}")
+            gyazo_url = upload_screenshot(page, f"Google Maps - tab click {'ok' if clicked else 'fail'}")
+            msg = f"タブクリック {'成功' if clicked else '失敗'}"
+            if gyazo_url:
+                msg += f" 📸 {gyazo_url}"
+            progress_callback(0, msg)
 
         if progress_callback:
             progress_callback(0, "新しい順にソート中...")
