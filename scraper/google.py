@@ -303,8 +303,11 @@ def _start_session(url: str, progress_callback=None, proxy: str | None = None):
             # 60秒タイムアウト: watchdogスレッドで監視、タイムアウト時にsession.close()で強制終了
             # session.start()はメインスレッドで実行（greenletスレッド親和性の制約回避）
             _timed_out = [False]
+            _wd_cancel = threading.Event()
             def _watchdog():
-                time.sleep(120)  # 120秒: 起動+warm-up+gotoをカバー
+                # session.start()のハング防止のみ（60秒）
+                if _wd_cancel.wait(60):
+                    return  # 正常起動でキャンセルされた
                 _timed_out[0] = True
                 try:
                     session.close()
@@ -315,12 +318,14 @@ def _start_session(url: str, progress_callback=None, proxy: str | None = None):
             try:
                 session.start()
             except Exception as e:
+                _wd_cancel.set()  # watchdog停止
                 if _timed_out[0]:
                     if progress_callback:
                         progress_callback(0, f"ブラウザ起動タイムアウト(60秒)、リトライ中... ({retry + 1}/{MAX_RETRIES})")
                     time.sleep(3)
                     continue
                 raise
+            _wd_cancel.set()  # 起動成功 → watchdog停止
             if progress_callback:
                 progress_callback(0, "ブラウザ起動完了")
         except Exception as e:
