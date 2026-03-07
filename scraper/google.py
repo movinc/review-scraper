@@ -5,6 +5,7 @@ import glob
 import shutil
 import time
 import uuid
+import random
 
 from scrapling.fetchers import StealthySession
 from scrapling.engines.toolbelt.fingerprints import generate_convincing_referer
@@ -16,9 +17,13 @@ from config import (
     GOOGLE_STALL_SECONDS,
     GOOGLE_NO_NEW_THRESHOLD,
     GOOGLE_MAX_SCROLLS,
-    GOOGLE_SCROLL_INTERVAL,
+    GOOGLE_SCROLL_INTERVAL_MIN,
+    GOOGLE_SCROLL_INTERVAL_MAX,
+    GOOGLE_WARMUP_DELAY_MIN,
+    GOOGLE_WARMUP_DELAY_MAX,
     GOOGLE_TAB_WAIT_SECONDS,
     GOOGLE_PROFILE_BASE,
+    GOOGLE_VIEWPORTS,
     MAX_RETRIES,
     TOR_PROXY_URL,
 )
@@ -90,24 +95,47 @@ def _ensure_reviews_tab(url: str) -> str:
 
 
 def scrape_google_reviews(url: str, progress_callback=None, review_save_callback=None) -> list[dict]:
-    """Scrape all reviews from a Google Maps URL."""
+    """Scrape all reviews from a Google Maps URL.
+    
+    0件で終了した場合、最大3回まで全体リトライする（「取れるまで粘る」戦略）。
+    """
     url = _resolve_url(url)
     # Note: !9m1!1b1 は付けない（概要タブで開いてからクチコミタブをクリックする方が確実）
     _clean_browser_profiles()
     if not any(d in url.lower() for d in ["google.com/maps", "google.co.jp/maps", "maps.app.goo.gl", "maps.google", "share.google"]):
         raise ValueError("Google MapsのURLを入力してください")
 
-    session = None
-    try:
-        page, session = _start_session(url, progress_callback)
-        reviews = _collect_all_reviews(page, session, url, progress_callback, review_save_callback)
-        return reviews
-    finally:
-        if session:
-            try:
-                session.close()
-            except Exception:
-                pass
+    MAX_OUTER_RETRIES = 3
+    all_collected = []
+
+    for outer in range(MAX_OUTER_RETRIES):
+        session = None
+        try:
+            if outer > 0:
+                if progress_callback:
+                    progress_callback(0, f"0件のため全体リトライ ({outer + 1}/{MAX_OUTER_RETRIES})...")
+                _clean_browser_profiles()
+                time.sleep(random.uniform(5, 15))
+
+            page, session = _start_session(url, progress_callback)
+            reviews = _collect_all_reviews(page, session, url, progress_callback, review_save_callback)
+
+            if reviews:
+                return reviews  # 取れたら即返す
+
+            if progress_callback:
+                progress_callback(0, f"0件で終了、リトライ判定中... ({outer + 1}/{MAX_OUTER_RETRIES})")
+        except RuntimeError as e:
+            if progress_callback:
+                progress_callback(0, f"エラー: {e}, リトライ判定中...")
+        finally:
+            if session:
+                try:
+                    session.close()
+                except Exception:
+                    pass
+
+    return all_collected  # 最終的に取れなかった
 
 
 def _check_cookies(session) -> dict:
@@ -129,14 +157,14 @@ def _warm_up_session(page, session):
             return True
 
         page.goto("https://www.google.co.jp/", wait_until="networkidle", timeout=GOOGLE_WARMUP_TIMEOUT_MS)
-        time.sleep(3)
+        time.sleep(random.uniform(GOOGLE_WARMUP_DELAY_MIN, GOOGLE_WARMUP_DELAY_MAX))
         page.goto("https://www.google.com/maps", wait_until="networkidle", timeout=GOOGLE_WARMUP_TIMEOUT_MS)
-        time.sleep(3)
+        time.sleep(random.uniform(GOOGLE_WARMUP_DELAY_MIN, GOOGLE_WARMUP_DELAY_MAX))
 
         check = _check_cookies(session)
         if check["missing"]:
             page.goto("https://www.google.co.jp/search?q=maps", wait_until="networkidle", timeout=GOOGLE_WARMUP_TIMEOUT_MS)
-            time.sleep(3)
+            time.sleep(random.uniform(GOOGLE_WARMUP_DELAY_MIN, GOOGLE_WARMUP_DELAY_MAX))
             check = _check_cookies(session)
 
         return not check["missing"]
@@ -229,6 +257,7 @@ def _start_session(url: str, progress_callback=None, proxy: str | None = None):
             effective_proxy = proxy if proxy is not None else get_proxy_for_retry(retry)
             if effective_proxy and progress_callback:
                 progress_callback(0, "Tor回線更新済み、新IP経由で接続中...")
+            viewport = random.choice(GOOGLE_VIEWPORTS)
             session_kwargs = dict(
                 headless=True,
                 locale="ja-JP",
@@ -260,6 +289,12 @@ def _start_session(url: str, progress_callback=None, proxy: str | None = None):
             if session.context.pages
             else session.context.new_page()
         )
+
+        # Viewport randomization for fingerprint diversity
+        try:
+            page.set_viewport_size(viewport)
+        except Exception:
+            pass
 
         # Block heavy resources (images only - NOT stylesheets/fonts, Google Maps SPA needs them)
         page.route(
@@ -295,10 +330,10 @@ def _start_session(url: str, progress_callback=None, proxy: str | None = None):
                 session.close()
             except Exception:
                 pass
-            time.sleep(3)
+            time.sleep(random.uniform(3, 8))
             continue
 
-        time.sleep(GOOGLE_TAB_WAIT_SECONDS)
+        time.sleep(random.uniform(GOOGLE_TAB_WAIT_SECONDS, GOOGLE_TAB_WAIT_SECONDS + 3))
 
         tabs = page.query_selector_all('button[role="tab"]')
         tab_names = [t.text_content().strip() for t in tabs]
@@ -316,7 +351,7 @@ def _start_session(url: str, progress_callback=None, proxy: str | None = None):
             shutil.rmtree(profile_dir, ignore_errors=True)
             profile_dir = os.path.join(GOOGLE_PROFILE_BASE, uuid.uuid4().hex[:8])
             os.makedirs(profile_dir, exist_ok=True)
-            time.sleep(5)
+            time.sleep(random.uniform(3, 8))
             continue
 
         if progress_callback:
@@ -544,7 +579,7 @@ def _collect_all_reviews(
             if progress_callback:
                 progress_callback(len(all_reviews), f"スクロールエラー: {scroll_err}")
             break
-        time.sleep(GOOGLE_SCROLL_INTERVAL)
+        time.sleep(random.uniform(GOOGLE_SCROLL_INTERVAL_MIN, GOOGLE_SCROLL_INTERVAL_MAX))
 
         elapsed = int(time.time() - last_new_time)
 

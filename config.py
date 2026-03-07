@@ -11,7 +11,10 @@ DUPLICATE_URL_MINUTES = 5        # Reject same URL within this window
 GOOGLE_PAGE_TIMEOUT_MS = 60_000  # 60s
 GOOGLE_WARMUP_TIMEOUT_MS = 30_000  # 15s (was 30s)
 GOOGLE_TAB_WAIT_SECONDS = 5     # 5s (was 8s)     # Wait after domcontentloaded for dynamic content
-GOOGLE_SCROLL_INTERVAL = 1.0
+GOOGLE_SCROLL_INTERVAL_MIN = 1.5   # ランダムスクロール間隔（秒）
+GOOGLE_SCROLL_INTERVAL_MAX = 2.5
+GOOGLE_WARMUP_DELAY_MIN = 2.0     # warm-up間のランダム遅延（秒）
+GOOGLE_WARMUP_DELAY_MAX = 5.0
 GOOGLE_STALL_SECONDS = 60       # No new reviews for this long → finish
 GOOGLE_NO_NEW_THRESHOLD = 5     # Consecutive empty scroll rounds → finish
 GOOGLE_MAX_SCROLLS = 2000
@@ -40,3 +43,13 @@ GOOGLE_PROFILE_BASE = os.environ.get("GOOGLE_PROFILE_BASE", "/tmp/google-profile
 # --- Firestore ---
 FIRESTORE_COLLECTION = "scrape_jobs"
 FIRESTORE_BATCH_SIZE = 450      # Max docs per Firestore batch (limit is 500)
+
+# --- Viewport randomization ---
+GOOGLE_VIEWPORTS = [
+    {"width": 1920, "height": 1080},
+    {"width": 1366, "height": 768},
+    {"width": 1536, "height": 864},
+    {"width": 1440, "height": 900},
+    {"width": 1280, "height": 720},
+    {"width": 1600, "height": 900},
+]
