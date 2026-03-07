@@ -78,7 +78,12 @@ body{font-family:'Inter','Noto Sans JP',system-ui,sans-serif;background:var(--bg
 .job-error.expanded .err-short{display:none}
 .job-error.expanded .err-full{display:inline;word-break:break-all}
 .job-actions{display:flex;gap:4px;padding:0 16px 12px;flex-wrap:wrap;align-items:center}
-.job-actions .time-label{font-size:11px;color:var(--text-tertiary);margin-right:auto}
+.job-actions .time-label{font-size:11px;color:var(--text-tertiary);margin-left:auto}
+.instance-summary{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 12px;margin-bottom:12px;font-size:11px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.instance-summary .is-label{font-weight:700;color:var(--text-tertiary);text-transform:uppercase;letter-spacing:0.05em;font-size:10px}
+.instance-chip{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:10px;background:var(--surface2);font-family:var(--mono);font-size:10px}
+.instance-chip .chip-dot{width:6px;height:6px;border-radius:50%}
+.instance-chip .chip-count{font-weight:700}
 .abtn{padding:6px 12px;min-height:36px;border-radius:5px;font-size:11px;font-weight:600;background:var(--surface2);border:1px solid var(--border-light);color:var(--text-secondary);cursor:pointer;font-family:inherit;transition:all 100ms;display:inline-flex;align-items:center;gap:3px}
 .abtn:hover{background:var(--bg);border-color:var(--border);color:var(--text)}
 .abtn.dl{color:var(--accent);border-color:rgba(66,99,235,0.2);background:var(--accent-soft)}
@@ -175,6 +180,7 @@ tr:hover td{background:var(--surface2)}
       <div style="display:flex;gap:6px"><button class="btn-sm stop" onclick="stopAll()">⏹ すべて停止</button><button class="btn-sm del-all" onclick="clearAll()">🗑 すべて削除</button></div>
 
     </div>
+    <div id="instanceSummary" class="instance-summary" style="display:none"></div>
     <div class="job-list" id="jobList"><div class="empty">URLを入力して取得開始</div></div>
   </div>
   <div class="tab-content" id="tab-api">
@@ -482,9 +488,8 @@ function render(){
         <button class="abtn del" data-del="${j.id}" title="ダブルクリックで削除" onclick="event.stopPropagation()" style="align-self:flex-start;margin-top:2px">🗑</button>
       </div>
       <div class="job-actions">
-        <span class="time-label">${fmtTime(j.time)}</span>
         ${st==='running'?`<button class="abtn del" onclick="event.stopPropagation();cancelJob('${j.id}')">⏹停止</button>`:''}<button class="abtn" onclick="event.stopPropagation();rerunJob('${j.id}')">🔄再実行</button><button class="abtn" onclick="showPanel('${j.id}','logs')">📋ログ</button>${st==='done'?`<button class="abtn" onclick="showPanel('${j.id}','results')">結果</button><button class="abtn dl" onclick="dlCsv('${j.id}')">CSV</button><button class="abtn dl" onclick="dlJson('${j.id}')">JSON</button>`:''}
-
+        <span class="time-label">${fmtTime(j.time)}</span>
       </div>
       <div class="job-detail ${detailOpen}" id="detail-${j.id}">
         <div class="detail-tabs">
@@ -500,6 +505,37 @@ function render(){
     const pg=makePagination(currentPage,totalPages,'goPage');
     list.insertAdjacentHTML('beforeend',pg);}
   for(const[id,mode] of Object.entries(openPanels)){if(mode==='results')loadResults(id);if(mode==='logs')loadLogs(id)}
+  updateInstanceSummary(jobs);
+}
+function updateInstanceSummary(jobs) {
+  const el = document.getElementById('instanceSummary');
+  if (!el) return;
+  const instances = {};
+  let queuedCount = 0;
+  jobs.forEach(j => {
+    if (j.status === 'queued') {
+      queuedCount++;
+    } else if (j.status === 'running' && j.instance) {
+      if (!instances[j.instance]) instances[j.instance] = {running: 0, name: j.instance};
+      instances[j.instance].running++;
+    }
+  });
+  const entries = Object.values(instances);
+  if (entries.length === 0 && queuedCount === 0) {
+    el.style.display = 'none';
+    return;
+  }
+  el.style.display = 'flex';
+  let html = '<span class="is-label">🖥 インスタンス</span>';
+  entries.forEach(inst => {
+    const color = instanceColor(inst.name);
+    const short = inst.name.replace(/^review-scraper-/, '');
+    html += `<span class="instance-chip"><span class="chip-dot" style="background:${color}"></span>${short}: <span class="chip-count">${inst.running}実行中</span></span>`;
+  });
+  if (queuedCount > 0) {
+    html += `<span class="instance-chip"><span class="chip-dot" style="background:var(--accent)"></span>キュー待ち: <span class="chip-count">${queuedCount}</span></span>`;
+  }
+  el.innerHTML = html;
 }
 function goPage(p){currentPage=p;render();window.scrollTo(0,document.getElementById('jobList').offsetTop-20)}
 
