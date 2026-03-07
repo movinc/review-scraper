@@ -276,7 +276,27 @@ def _start_session(url: str, progress_callback=None, proxy: str | None = None):
             if progress_callback:
                 progress_callback(0, f"Session kwargs: headless={session_kwargs.get('headless')}, hide_canvas={session_kwargs.get('hide_canvas')}, block_webrtc={session_kwargs.get('block_webrtc')}")
             session = StealthySession(**session_kwargs)
-            session.start()
+            # 60秒タイムアウト付きでブラウザ起動
+            startup_error = [None]
+            def _start():
+                try:
+                    session.start()
+                except Exception as se:
+                    startup_error[0] = se
+            t = threading.Thread(target=_start, daemon=True)
+            t.start()
+            t.join(timeout=60)
+            if t.is_alive():
+                if progress_callback:
+                    progress_callback(0, f"ブラウザ起動タイムアウト(60秒)、リトライ中... ({retry + 1}/{MAX_RETRIES})")
+                try:
+                    session.close()
+                except Exception:
+                    pass
+                time.sleep(3)
+                continue
+            if startup_error[0]:
+                raise startup_error[0]
             if progress_callback:
                 progress_callback(0, "ブラウザ起動完了")
         except Exception as e:

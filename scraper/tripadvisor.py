@@ -6,6 +6,7 @@ while page_action gives us direct Playwright page control for navigation.
 """
 import re
 import time
+import threading
 
 from scrapling.fetchers import StealthyFetcher
 
@@ -469,10 +470,27 @@ def scrape_tripadvisor_reviews(url: str, progress_callback=None, review_save_cal
                 if progress_callback:
                     progress_callback(0, "Tor経由で接続中...")
 
-            StealthyFetcher.fetch(
-                domain + "/",
-                **fetch_kwargs,
-            )
+            # タイムアウト付きでfetch実行（ブラウザ起動ハング防止）
+            fetch_error = [None]
+            def _do_fetch():
+                try:
+                    StealthyFetcher.fetch(
+                        domain + "/",
+                        **fetch_kwargs,
+                    )
+                except Exception as fe:
+                    fetch_error[0] = fe
+            ft = threading.Thread(target=_do_fetch, daemon=True)
+            ft.start()
+            remaining = max(60, TA_MAX_TIME_SECONDS - int(time.time() - start_time))
+            ft.join(timeout=remaining)
+            if ft.is_alive():
+                if progress_callback:
+                    progress_callback(len(result.get("reviews", [])), f"タイムアウト({remaining}秒)、リトライ...")
+                time.sleep(3)
+                continue
+            if fetch_error[0]:
+                raise fetch_error[0]
 
             if result["error"]:
                 last_error = result["error"]
