@@ -31,6 +31,7 @@ from utils.date_parser import parse_japanese_date
 from utils.tor import get_proxy_for_retry
 import utils.tor as tor_utils
 from css_selectors import GOOGLE, query_first, query_all_first
+from utils.gyazo import upload_screenshot
 
 
 REQUIRED_COOKIES = {"AEC", "NID"}  # Minimum cookies needed for reviews tab
@@ -338,12 +339,22 @@ def _start_session(url: str, progress_callback=None, proxy: str | None = None):
         tabs = page.query_selector_all('button[role="tab"]')
         tab_names = [t.text_content().strip() for t in tabs]
         has_review_tab = any('クチコミ' in n for n in tab_names)
+        
+        # Gyazo: ページ読み込み後スクリーンショット
+        gyazo_url = upload_screenshot(page, f"Google Maps - page loaded (tabs: {len(tabs)})")
         if progress_callback:
-            progress_callback(0, f"タブ検出: {len(tabs)}個 ({', '.join(tab_names)})")
+            tab_msg = f"タブ検出: {len(tabs)}個 ({', '.join(tab_names)})"
+            if gyazo_url:
+                tab_msg += f" 📸 {gyazo_url}"
+            progress_callback(0, tab_msg)
 
         if not has_review_tab:
+            gyazo_url = upload_screenshot(page, f"Google Maps - no review tab (retry {retry+1})")
             if progress_callback:
-                progress_callback(0, f"クチコミタブなし（{', '.join(tab_names)}）、リトライ...")
+                msg = f"クチコミタブなし（{', '.join(tab_names)}）、リトライ..."
+                if gyazo_url:
+                    msg += f" 📸 {gyazo_url}"
+                progress_callback(0, msg)
             try:
                 session.close()
             except Exception:
@@ -388,8 +399,12 @@ def _start_session(url: str, progress_callback=None, proxy: str | None = None):
                 time.sleep(3)
 
         if found:
+            gyazo_url = upload_screenshot(page, "Google Maps - reviews found")
             if progress_callback:
-                progress_callback(0, "レビュー検出OK、収集開始...")
+                msg = "レビュー検出OK、収集開始..."
+                if gyazo_url:
+                    msg += f" 📸 {gyazo_url}"
+                progress_callback(0, msg)
             return page, session
 
         last_error = "レビュー要素が見つかりませんでした"
