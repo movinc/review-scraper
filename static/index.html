@@ -440,7 +440,7 @@ function patchRunning(id,j){
   // ステータスバッジ更新
   const badge=card.querySelector('.badge');if(badge){badge.className='badge '+j.status;badge.innerHTML='<span class="dot"></span> '+(j.status==='running'?'実行中':j.status==='queued'?'キュー待ち':j.status==='done'?'完了':j.status==='failed'?'失敗':'停止')}
   const st=card.querySelector('.j-stats');if(st){let h='';if(j.count)h+=j.count+'件 · ';h+=fmtElapsed(Date.now()-new Date(j.time).getTime())+'経過';st.textContent=h}
-  const pg=card.querySelector('.j-prog');if(pg)pg.innerHTML='<span class="sp"></span> 進捗: '+fmtMsgText(j.message);
+  let pg=card.querySelector('.j-prog');if(!pg){pg=document.createElement('div');pg.className='job-progress j-prog';const info=card.querySelector('.job-info');if(info)info.appendChild(pg)}if(pg)pg.innerHTML='<span class="sp"></span> 進捗: '+fmtMsgText(j.message);
   // 最新スクリーンショットを進捗エリアに表示（1枚だけ、job-info内の固定位置）
   const ssUrl=j.last_screenshot||(j.message&&(j.message.match(/📸\s*(https:\/\/gyazo\.com\/[a-f0-9]+)/)||[])[1]);
   // 重複スクショ削除
@@ -480,7 +480,7 @@ function render(){
     if((st==='failed'||st==='cancelled')&&j.duration!=null){statsHtml+=(statsHtml?' · ':'')+'所要 '+fmtDur(j.duration);const c2=fmtCost(j.duration);if(c2)statsHtml+=' · '+c2}
 
     let progHtml='';
-    if(st==='running'&&j.message){
+    if((st==='running'||st==='queued')&&j.message){
       progHtml=`<div class="job-progress j-prog"><span class="sp"></span> 進捗: ${fmtMsgText(j.message)}</div>`;
       const ssU=j.last_screenshot||(j.message.match(/📸\s*(https:\/\/gyazo\.com\/[a-f0-9]+)/)||[])[1];
       if(ssU)progHtml+=`<div class="job-screenshot" data-url="${ssU}"><a href="${ssU}" target="_blank"><img src="${ssU}/raw" loading="lazy"></a></div>`;
