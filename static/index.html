@@ -494,7 +494,7 @@ function render(){
           <div class="job-stats"><span class="j-stats">${statsHtml}</span>${j.instance ? `<span class="instance-tag" style="border-left:3px solid ${instanceColor(j.instance)}">🖥 ${j.instance}</span>` : ''}</div>
           ${progHtml}${errHtml}
         </div>
-        <button class="abtn del" onclick="event.stopPropagation();removeJob('${j.id}')" style="align-self:flex-start;margin-top:2px">🗑</button>
+        <button class="abtn del" onclick="event.stopPropagation();if(confirm('削除しますか？'))removeJob('${j.id}')" style="align-self:flex-start;margin-top:2px">🗑</button>
       </div>
       <div class="job-actions">
         ${st==='running'?`<button class="abtn del" onclick="event.stopPropagation();cancelJob('${j.id}')">⏹停止</button>`:''}<button class="abtn" onclick="event.stopPropagation();rerunJob('${j.id}')">🔄再実行</button><button class="abtn" onclick="showPanel('${j.id}','logs')">📋ログ</button>${st==='done'?`<button class="abtn" onclick="showPanel('${j.id}','results')">結果</button><button class="abtn dl" onclick="dlCsv('${j.id}')">CSV</button><button class="abtn dl" onclick="dlJson('${j.id}')">JSON</button>`:''}
