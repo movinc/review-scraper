@@ -3,7 +3,7 @@ import os
 
 # --- Retry & Timeout ---
 MAX_RETRIES = 5
-JOB_TIMEOUT_SECONDS = 600        # 10 min overall job timeout
+JOB_TIMEOUT_SECONDS = 1800        # 10 min overall job timeout
 STALE_JOB_MINUTES = 30           # Mark running jobs older than this as failed on startup
 DUPLICATE_URL_MINUTES = 5        # Reject same URL within this window
 
