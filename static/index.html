@@ -454,8 +454,7 @@ function patchRunning(id,j){
 }
 
 function removeJob(id){jobs=jobs.filter(x=>x.id!==id);if(polls[id]){clearInterval(polls[id]);delete polls[id]}delete cache[id];delete openPanels[id];fetch('/jobs/'+id,{method:'DELETE'}).catch(()=>{});render()}
-// ダブルクリック削除
-document.addEventListener('dblclick',e=>{const b=e.target.closest('[data-del]');if(b)removeJob(b.dataset.del)})
+
 function stopAll(){if(!confirm('実行中のジョブをすべて停止しますか？'))return;const running=jobs.filter(j=>j.status==='running');if(!running.length){alert('実行中のジョブはありません');return}running.forEach(j=>{fetch('/jobs/'+j.id+'/cancel',{method:'POST'}).then(()=>{j.status='cancelled';j.message='ユーザーにより停止';updateCard(j)}).catch(()=>{})});}
 
 function clearAll(){if(!confirm('すべて削除しますか？'))return;jobs.forEach(j=>{if(polls[j.id]){clearInterval(polls[j.id]);delete polls[j.id]}delete cache[j.id];fetch('/jobs/'+j.id,{method:'DELETE'}).catch(()=>{})});jobs=[];openPanels={};render()}
@@ -493,7 +492,7 @@ function render(){
           <div class="job-stats"><span class="j-stats">${statsHtml}</span>${j.instance ? `<span class="instance-tag" style="border-left:3px solid ${instanceColor(j.instance)}">🖥 ${j.instance}</span>` : ''}</div>
           ${progHtml}${errHtml}
         </div>
-        <button class="abtn del" data-del="${j.id}" title="ダブルクリックで削除" onclick="event.stopPropagation()" style="align-self:flex-start;margin-top:2px">🗑</button>
+        <button class="abtn del" onclick="event.stopPropagation();if(confirm('削除しますか？'))removeJob('${j.id}')" style="align-self:flex-start;margin-top:2px">🗑</button>
       </div>
       <div class="job-actions">
         ${st==='running'?`<button class="abtn del" onclick="event.stopPropagation();cancelJob('${j.id}')">⏹停止</button>`:''}<button class="abtn" onclick="event.stopPropagation();rerunJob('${j.id}')">🔄再実行</button><button class="abtn" onclick="showPanel('${j.id}','logs')">📋ログ</button>${st==='done'?`<button class="abtn" onclick="showPanel('${j.id}','results')">結果</button><button class="abtn dl" onclick="dlCsv('${j.id}')">CSV</button><button class="abtn dl" onclick="dlJson('${j.id}')">JSON</button>`:''}
