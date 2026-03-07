@@ -1,5 +1,6 @@
 """FastAPI web service for scraping reviews from Google Maps and TripAdvisor."""
 import asyncio
+import re
 import uuid
 from datetime import datetime, timezone, timedelta
 
@@ -81,6 +82,7 @@ def get_job(job_id: str):
         "review_count": job.get("review_count", 0),
         "duration": job.get("duration"),
         **({"error": job["error"]} if job.get("error") else {}),
+        **({"last_screenshot": job["last_screenshot"]} if job.get("last_screenshot") else {}),
     })
 
 
@@ -172,9 +174,14 @@ async def _run_scrape(job_id: str, url: str, source: Source):
                 raise
             except Exception:
                 pass  # Firestore error shouldn't kill scraping
+        # Gyazo URLがあればlast_screenshotに保存
+        extra = {}
+        gyazo_match = re.search(r'📸\s*(https://gyazo\.com/[a-f0-9]+)', message)
+        if gyazo_match:
+            extra['last_screenshot'] = gyazo_match.group(1)
         # Always update status (lightweight)
         try:
-            db.update_job(job_id, progress=count, message=message, review_count=count)
+            db.update_job(job_id, progress=count, message=message, review_count=count, **extra)
         except Exception:
             pass
         # Log every 3rd call to reduce Firestore writes

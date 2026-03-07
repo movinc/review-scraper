@@ -69,6 +69,8 @@ body{font-family:'Inter','Noto Sans JP',system-ui,sans-serif;background:var(--bg
 .badge.running .dot{animation:blink 1.4s ease-in-out infinite}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:0.2}}
 .job-progress{font-size:12px !important;color:var(--warning);margin-top:6px;display:flex;align-items:center;gap:6px}
+.job-screenshot{margin-top:6px}
+.job-screenshot img{max-width:280px;max-height:180px;border-radius:6px;border:1px solid var(--border);transition:opacity 0.3s}
 .job-error{font-size:11px;color:var(--danger);margin-top:6px;cursor:pointer}
 .job-error .err-full{display:none}
 .job-error.expanded .err-short{display:none}
@@ -411,7 +413,12 @@ async function pollJob(id){
 function patchRunning(id,j){
   const card=document.querySelector('[data-id="'+id+'"]');if(!card)return;
   const st=card.querySelector('.j-stats');if(st){let h='';if(j.count)h+=j.count+'件 · ';h+=fmtElapsed(Date.now()-new Date(j.time).getTime())+'経過';st.textContent=h}
-  const pg=card.querySelector('.j-prog');if(pg)pg.innerHTML='<span class="sp"></span> '+fmtMsg(j.message)
+  const pg=card.querySelector('.j-prog');if(pg)pg.innerHTML='<span class="sp"></span> '+fmtMsg(j.message);
+  // 最新スクリーンショットを進捗エリアに表示
+  let ssEl=card.querySelector('.job-screenshot');
+  const ssUrl=j.last_screenshot||(j.message&&(j.message.match(/📸\s*(https:\/\/gyazo\.com\/[a-f0-9]+)/)||[])[1]);
+  if(!ssEl&&ssUrl){ssEl=document.createElement('div');ssEl.className='job-screenshot';const pgParent=pg||card;pgParent.parentNode.insertBefore(ssEl,pgParent.nextSibling)}
+  if(ssEl&&ssUrl){if(ssEl.dataset.url!==ssUrl){ssEl.dataset.url=ssUrl;ssEl.innerHTML='<a href="'+ssUrl+'" target="_blank"><img src="'+ssUrl+'/raw" loading="lazy"></a>'}}
 }
 
 function removeJob(id){jobs=jobs.filter(x=>x.id!==id);if(polls[id]){clearInterval(polls[id]);delete polls[id]}delete cache[id];delete openPanels[id];fetch('/jobs/'+id,{method:'DELETE'}).catch(()=>{});render()}
@@ -432,7 +439,11 @@ function render(){
     if(st==='failed'&&j.duration!=null){statsHtml+=(statsHtml?' · ':'')+fmtDur(j.duration)}
 
     let progHtml='';
-    if(st==='running'&&j.message)progHtml=`<div class="job-progress j-prog"><span class="sp"></span> ${fmtMsg(j.message)}</div>`;
+    if(st==='running'&&j.message){
+      progHtml=`<div class="job-progress j-prog"><span class="sp"></span> ${fmtMsg(j.message)}</div>`;
+      const ssU=j.last_screenshot||(j.message.match(/📸\s*(https:\/\/gyazo\.com\/[a-f0-9]+)/)||[])[1];
+      if(ssU)progHtml+=`<div class="job-screenshot" data-url="${ssU}"><a href="${ssU}" target="_blank"><img src="${ssU}/raw" loading="lazy"></a></div>`;
+    }
     let errHtml='';
     if(st==='failed'&&j.error){const s=j.error.length>80?j.error.substring(0,80)+'…':j.error;errHtml=`<div class="job-error" onclick="event.stopPropagation();this.classList.toggle('expanded')">⚠️ <span class="err-short">${esc(s)}</span><span class="err-full">${esc(j.error)}</span></div>`}
 
