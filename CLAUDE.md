@@ -39,3 +39,21 @@ Deploy on Google Cloud Run.
 - Use `headless=True` always
 - Block images via `page.route()` for memory savings
 - CSV encoding: `utf-8-sig` (BOM for Excel)
+
+## 開発ルール
+
+### テスト方針
+- **新機能・バグ修正のたびに関連テストを追加する**（都度足す方式）
+- 一括で全カバレッジを目指さない。変更したコードのテストを書く
+- 全てmock（ブラウザ/Firestore実行不要）
+- 実行: `python -m pytest tests/ -v`
+
+### デプロイ
+- `bash deploy.sh` でビルド＆Cloud Runデプロイ
+- デプロイ前に `python -c "import ast; ast.parse(open('main.py').read())"` でsyntax確認
+- テストがあるなら `pytest` も通してからデプロイ
+
+### コード変更時
+- 必ず `git commit & push` してからデプロイ
+- 設定値は `config.py` に集約（マジックナンバー禁止）
+- CSSセレクターは `css_selectors.py` に集約
