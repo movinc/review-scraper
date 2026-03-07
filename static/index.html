@@ -441,7 +441,7 @@ function render(){
     const st=j.status;
     const stLbl={running:'実行中',done:'完了',failed:'失敗',cancelled:'停止'}[st]||st;
     let statsHtml='';
-    if(j.count)statsHtml+=j.count+'件';
+    if(j.count)statsHtml+='<span style="font-size:18px;font-weight:700;color:var(--text-primary)">'+j.count+'</span>件';
     if(st==='done'&&j.duration!=null){statsHtml+=(statsHtml?' · ':'')+'所要 '+fmtDur(j.duration);const c=fmtCost(j.duration);if(c)statsHtml+=' · '+c}
     if(st==='running'){const el=fmtElapsed(Date.now()-new Date(j.time).getTime());statsHtml+=(statsHtml?' · ':'')+el+'経過'}
     if((st==='failed'||st==='cancelled')&&j.duration!=null){statsHtml+=(statsHtml?' · ':'')+'所要 '+fmtDur(j.duration);const c2=fmtCost(j.duration);if(c2)statsHtml+=' · '+c2}
