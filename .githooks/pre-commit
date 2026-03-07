@@ -1,0 +1,9 @@
+#!/bin/bash
+echo "🧪 Running tests..."
+cd "$(git rev-parse --toplevel)"
+python3 -m pytest tests/ -q --tb=short 2>&1
+if [ $? -ne 0 ]; then
+    echo "❌ テスト失敗 — コミットを中止します"
+    exit 1
+fi
+echo "✅ テスト通過"
