@@ -218,6 +218,24 @@ def scrape_tripadvisor_reviews(url: str, progress_callback=None, review_save_cal
                         break
                 page.wait_for_timeout(2000)
 
+                # 言語リダイレクトモーダルを閉じる
+                try:
+                    close_btn = page.query_selector('[class*="close"], button[aria-label*="close" i], button[aria-label*="Close" i]')
+                    if not close_btn:
+                        # Xボタンを探す（モーダル内）
+                        for btn in page.query_selector_all('button'):
+                            txt = btn.inner_text().strip()
+                            if txt in ('×', 'X', '✕', '✖'):
+                                close_btn = btn
+                                break
+                    if close_btn:
+                        close_btn.click(force=True)
+                        page.wait_for_timeout(1000)
+                        if pcb:
+                            pcb(0, "リダイレクトモーダルを閉じました")
+                except Exception:
+                    pass
+
                 # レストランページ読み込み完了スクリーンショット
                 gyazo_loaded = upload_screenshot(page, "TripAdvisor - restaurant page loaded")
                 if pcb:

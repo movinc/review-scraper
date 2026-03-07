@@ -444,7 +444,7 @@ function render(){
     if(j.count)statsHtml+=j.count+'件';
     if(st==='done'&&j.duration!=null){statsHtml+=(statsHtml?' · ':'')+'所要 '+fmtDur(j.duration);const c=fmtCost(j.duration);if(c)statsHtml+=' · '+c}
     if(st==='running'){const el=fmtElapsed(Date.now()-new Date(j.time).getTime());statsHtml+=(statsHtml?' · ':'')+el+'経過'}
-    if(st==='failed'&&j.duration!=null){statsHtml+=(statsHtml?' · ':'')+fmtDur(j.duration)}
+    if((st==='failed'||st==='cancelled')&&j.duration!=null){statsHtml+=(statsHtml?' · ':'')+'所要 '+fmtDur(j.duration);const c2=fmtCost(j.duration);if(c2)statsHtml+=' · '+c2}
 
     let progHtml='';
     if(st==='running'&&j.message){
@@ -460,12 +460,11 @@ function render(){
     return `<div class="job-card" data-id="${j.id}">
       <div class="job-top">
         <div class="job-info">
-          <div class="job-title"><a href="${esc(j.url)}" target="_blank" onclick="event.stopPropagation()">${esc(j.name)}</a> <span class="src-tag ${j.source}">${srcLabel(j.source)}</span> <code style="font-size:10px;color:var(--text-tertiary);background:var(--surface2);padding:1px 5px;border-radius:3px;user-select:all">Job ID: ${j.id}</code></div>
+          <div class="job-title"><span class="badge ${st}"><span class="dot"></span>${stLbl}</span> <a href="${esc(j.url)}" target="_blank" onclick="event.stopPropagation()">${esc(j.name)}</a> <span class="src-tag ${j.source}">${srcLabel(j.source)}</span> <code style="font-size:10px;color:var(--text-tertiary);background:var(--surface2);padding:1px 5px;border-radius:3px;user-select:all">Job ID: ${j.id}</code></div>
           <div class="job-url"><a href="${esc(j.url)}" target="_blank" onclick="event.stopPropagation()">${esc(j.url)}</a></div>
           <div class="job-stats"><span class="j-stats">${statsHtml}</span></div>
           ${progHtml}${errHtml}
         </div>
-        <span class="badge ${st}"><span class="dot"></span>${stLbl}</span>
       </div>
       <div class="job-actions">
         <span class="time-label">${fmtTime(j.time)}</span>
