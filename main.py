@@ -72,6 +72,10 @@ async def build_info():
 def favicon():
     return FileResponse("static/favicon.svg", media_type="image/svg+xml")
 
+@app.get("/robots.txt")
+def robots():
+    return FileResponse("static/robots.txt", media_type="text/plain")
+
 
 @app.get("/")
 def index():
