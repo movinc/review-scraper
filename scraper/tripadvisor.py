@@ -401,16 +401,11 @@ def scrape_tripadvisor_reviews(url: str, progress_callback=None, review_save_cal
                                 msg += f" 📸 {gyazo_url}"
                             pcb(len(all_reviews), msg)
                         break
-                    if new_count < TA_REVIEWS_PER_PAGE:
-                        if pcb:
-                            pcb(len(all_reviews), f"ページ{page_num + 1}: {new_count}件（{TA_REVIEWS_PER_PAGE}未満=最終ページ）、収集完了")
-                        break
-
                     page_num += 1
                     if page_num >= TA_MAX_PAGES:
                         break
 
-                    # 「次へ」ボタンクリック（SPA内遷移でフィルタ維持）
+                    # 「次へ」ボタンで最終ページ判定（件数ではなく次へボタンの有無で判断）
                     nxt = page.query_selector('a[aria-label*="Next"], a[aria-label*="次"]')
                     if not nxt:
                         if pcb:

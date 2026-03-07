@@ -625,6 +625,7 @@ def _collect_all_reviews(
     """
     saved_ids: set = set()
     all_reviews: list[dict] = []
+    start_time = time.time()
 
     all_reviews.extend(_extract_reviews_from_dom(page, saved_ids))
     if progress_callback:
