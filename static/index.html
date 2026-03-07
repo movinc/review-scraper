@@ -162,7 +162,7 @@ tr:hover td{background:var(--surface2)}
     </div>
     <div class="sec-header" id="secHeader" style="display:none">
       <h3>履歴</h3>
-      <span class="link-danger" onclick="clearAll()">すべて削除</span> <span class="link-danger" onclick="flushInstances()" style="margin-left:8px" title="全ジョブ停止＋旧インスタンス解放">リセット</span>
+
     </div>
     <div class="job-list" id="jobList"><div class="empty">URLを入力して取得開始</div></div>
   </div>
@@ -428,8 +428,8 @@ function patchRunning(id,j){
 }
 
 function removeJob(id){jobs=jobs.filter(x=>x.id!==id);if(polls[id]){clearInterval(polls[id]);delete polls[id]}delete cache[id];delete openPanels[id];fetch('/jobs/'+id,{method:'DELETE'}).catch(()=>{});render()}
-// 長押し削除（600ms）
-document.addEventListener('pointerdown',e=>{const b=e.target.closest('[data-del]');if(!b)return;b._lp=setTimeout(()=>{b.style.opacity='0.3';removeJob(b.dataset.del)},600);b.addEventListener('pointerup',()=>{clearTimeout(b._lp)},{once:true});b.addEventListener('pointerleave',()=>{clearTimeout(b._lp)},{once:true})})
+// ダブルクリック削除
+document.addEventListener('dblclick',e=>{const b=e.target.closest('[data-del]');if(b)removeJob(b.dataset.del)})
 function clearAll(){if(!confirm('すべて削除しますか？'))return;jobs.forEach(j=>{if(polls[j.id]){clearInterval(polls[j.id]);delete polls[j.id]}delete cache[j.id];fetch('/jobs/'+j.id,{method:'DELETE'}).catch(()=>{})});jobs=[];openPanels={};render()}
 
 function render(){
@@ -469,7 +469,7 @@ function render(){
       <div class="job-actions">
         <span class="time-label">${fmtTime(j.time)}</span>
         ${st==='running'?`<button class="abtn del" onclick="event.stopPropagation();cancelJob('${j.id}')">⏹停止</button>`:''}<button class="abtn" onclick="event.stopPropagation();rerunJob('${j.id}')">🔄再実行</button><button class="abtn" onclick="showPanel('${j.id}','logs')">📋ログ</button>${st==='done'?`<button class="abtn" onclick="showPanel('${j.id}','results')">結果</button><button class="abtn dl" onclick="dlCsv('${j.id}')">CSV</button><button class="abtn dl" onclick="dlJson('${j.id}')">JSON</button>`:''}
-        <button class="abtn del" data-del="${j.id}" title="長押しで削除">削除</button>
+        <button class="abtn del" data-del="${j.id}" title="ダブルクリックで削除">削除</button>
       </div>
       <div class="job-detail ${detailOpen}" id="detail-${j.id}">
         <div class="detail-tabs">
