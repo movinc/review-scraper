@@ -441,11 +441,14 @@ function patchRunning(id,j){
   const badge=card.querySelector('.badge');if(badge){badge.className='badge '+j.status;badge.innerHTML='<span class="dot"></span> '+(j.status==='running'?'実行中':j.status==='queued'?'キュー待ち':j.status==='done'?'完了':j.status==='failed'?'失敗':'停止')}
   const st=card.querySelector('.j-stats');if(st){let h='';if(j.count)h+=j.count+'件 · ';h+=fmtElapsed(Date.now()-new Date(j.time).getTime())+'経過';st.textContent=h}
   const pg=card.querySelector('.j-prog');if(pg)pg.innerHTML='<span class="sp"></span> 進捗: '+fmtMsgText(j.message);
-  // 最新スクリーンショットを進捗エリアに表示
-  let ssEl=card.querySelector('.job-screenshot');
+  // 最新スクリーンショットを進捗エリアに表示（1枚だけ）
   const ssUrl=j.last_screenshot||(j.message&&(j.message.match(/📸\s*(https:\/\/gyazo\.com\/[a-f0-9]+)/)||[])[1]);
-  if(!ssEl&&ssUrl){ssEl=document.createElement('div');ssEl.className='job-screenshot';const pgParent=pg||card;pgParent.parentNode.insertBefore(ssEl,pgParent.nextSibling)}
+  // 古いスクショを全削除
+  card.querySelectorAll('.job-screenshot').forEach((el,i)=>{if(i>0)el.remove()});
+  let ssEl=card.querySelector('.job-screenshot');
+  if(!ssEl&&ssUrl){ssEl=document.createElement('div');ssEl.className='job-screenshot';const pgParent=pg||card.querySelector('.job-info');if(pgParent&&pgParent.parentNode)pgParent.parentNode.insertBefore(ssEl,pgParent.nextSibling)}
   if(ssEl&&ssUrl){if(ssEl.dataset.url!==ssUrl){ssEl.dataset.url=ssUrl;ssEl.innerHTML='<a href="'+ssUrl+'" target="_blank"><img src="'+ssUrl+'/raw" loading="lazy"></a>'}}
+  if(ssEl&&!ssUrl){ssEl.remove()}
   // インスタンスタグ更新
   let itag=card.querySelector('.instance-tag');
   if(j.instance){
