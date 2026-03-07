@@ -162,7 +162,7 @@ tr:hover td{background:var(--surface2)}
     </div>
     <div class="sec-header" id="secHeader" style="display:none">
       <h3>履歴</h3>
-      <div style="display:flex;gap:6px"><button class="btn-sm" onclick="clearAll()">すべて削除</button></div>
+      <div style="display:flex;gap:6px"><button class="btn-sm" onclick="stopAll()">すべて停止</button><button class="btn-sm" onclick="clearAll()">すべて削除</button></div>
 
     </div>
     <div class="job-list" id="jobList"><div class="empty">URLを入力して取得開始</div></div>
@@ -431,6 +431,8 @@ function patchRunning(id,j){
 function removeJob(id){jobs=jobs.filter(x=>x.id!==id);if(polls[id]){clearInterval(polls[id]);delete polls[id]}delete cache[id];delete openPanels[id];fetch('/jobs/'+id,{method:'DELETE'}).catch(()=>{});render()}
 // ダブルクリック削除
 document.addEventListener('dblclick',e=>{const b=e.target.closest('[data-del]');if(b)removeJob(b.dataset.del)})
+function stopAll(){if(!confirm('実行中のジョブをすべて停止しますか？'))return;const running=jobs.filter(j=>j.status==='running');if(!running.length){alert('実行中のジョブはありません');return}running.forEach(j=>{fetch('/jobs/'+j.id+'/cancel',{method:'POST'}).then(()=>{j.status='cancelled';j.message='ユーザーにより停止';updateCard(j)}).catch(()=>{})});}
+
 function clearAll(){if(!confirm('すべて削除しますか？'))return;jobs.forEach(j=>{if(polls[j.id]){clearInterval(polls[j.id]);delete polls[j.id]}delete cache[j.id];fetch('/jobs/'+j.id,{method:'DELETE'}).catch(()=>{})});jobs=[];openPanels={};render()}
 
 function render(){
