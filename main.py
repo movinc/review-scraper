@@ -201,12 +201,11 @@ async def _run_scrape(job_id: str, url: str, source: Source):
             db.update_job(job_id, progress=count, message=message, review_count=count, **extra)
         except Exception:
             pass
-        # Log every 3rd call to reduce Firestore writes
-        if _progress_counter[0] % 3 == 0 or 'エラー' in message or '完了' in message or '開始' in message or '検出' in message or '🔍' in message or '📸' in message or 'リカバリ' in message:
-            try:
-                db.append_log(job_id, message)
-            except Exception:
-                pass
+        # Log every call
+        try:
+            db.append_log(job_id, message)
+        except Exception:
+            pass
 
     def on_reviews(batch: list[dict]):
         db.save_review_batch(job_id, batch)
