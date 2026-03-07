@@ -633,7 +633,7 @@ def _collect_all_reviews(
             gyazo_url = upload_screenshot(page, f"Google Maps - scrolling ({len(all_reviews)} reviews, scroll {i+1})")
             last_screenshot_time = time.time()
             if progress_callback and gyazo_url:
-                progress_callback(len(all_reviews), f"📸 {gyazo_url}")
+                progress_callback(len(all_reviews), f"🔍 30秒チェック: {len(all_reviews)}件収集中 (経過{int(time.time()-start_time)}秒, scroll {i+1}) 📸 {gyazo_url}")
 
         # 毎スクロール進捗更新
         if progress_callback:

@@ -356,7 +356,8 @@ def scrape_tripadvisor_reviews(url: str, progress_callback=None, review_save_cal
                         gyazo_url = upload_screenshot(page, f"TripAdvisor - page {page_num+1} ({len(all_reviews)} reviews)")
                         last_screenshot_time = time.time()
                         if pcb and gyazo_url:
-                            pcb(len(all_reviews), f"📸 {gyazo_url}")
+                            elapsed_sec = int(time.time() - st) if st else 0
+                            pcb(len(all_reviews), f"🔍 30秒チェック: {len(all_reviews)}件収集中 (ページ{page_num+1}, 経過{elapsed_sec}秒) 📸 {gyazo_url}")
                     if pcb:
                         pcb(len(all_reviews), f"ページ{page_num + 1}: {new_count}件取得 (合計{len(all_reviews)}件)")
 
