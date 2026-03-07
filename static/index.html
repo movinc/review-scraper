@@ -465,11 +465,12 @@ function render(){
           <div class="job-stats"><span class="j-stats">${statsHtml}</span></div>
           ${progHtml}${errHtml}
         </div>
+        <button class="abtn del" data-del="${j.id}" title="ダブルクリックで削除" onclick="event.stopPropagation()" style="align-self:flex-start;margin-top:2px">🗑</button>
       </div>
       <div class="job-actions">
         <span class="time-label">${fmtTime(j.time)}</span>
         ${st==='running'?`<button class="abtn del" onclick="event.stopPropagation();cancelJob('${j.id}')">⏹停止</button>`:''}<button class="abtn" onclick="event.stopPropagation();rerunJob('${j.id}')">🔄再実行</button><button class="abtn" onclick="showPanel('${j.id}','logs')">📋ログ</button>${st==='done'?`<button class="abtn" onclick="showPanel('${j.id}','results')">結果</button><button class="abtn dl" onclick="dlCsv('${j.id}')">CSV</button><button class="abtn dl" onclick="dlJson('${j.id}')">JSON</button>`:''}
-        <button class="abtn del" data-del="${j.id}" title="ダブルクリックで削除">削除</button>
+
       </div>
       <div class="job-detail ${detailOpen}" id="detail-${j.id}">
         <div class="detail-tabs">
