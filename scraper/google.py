@@ -337,10 +337,19 @@ def _start_session(url: str, progress_callback=None, proxy: str | None = None):
         if not cookies_ok:
             check = _check_cookies(session)
             if progress_callback:
-                progress_callback(0, f"Cookie不足 (missing: {check['missing']}, present: {check['present']}, all: {check['all_google']})")
-        else:
-            if progress_callback:
-                progress_callback(0, "Cookie OK、ページ読み込み中...")
+                progress_callback(0, f"Cookie不足 (missing: {check['missing']}, present: {check['present']})")
+            # Cookie不足でもmissing=set()なら実質OK、そうでなければリトライ
+            if check["missing"]:
+                if progress_callback:
+                    progress_callback(0, f"Cookie不足、リトライ中... ({retry + 1}/{MAX_RETRIES})")
+                try:
+                    session.close()
+                except Exception:
+                    pass
+                time.sleep(3)
+                continue
+        if progress_callback:
+            progress_callback(0, "Cookie OK、ページ読み込み中...")
 
         url = _resolve_share_url_in_browser(page, url)
 
@@ -349,8 +358,10 @@ def _start_session(url: str, progress_callback=None, proxy: str | None = None):
         try:
             referer = generate_convincing_referer(url)
             page.goto(
-                url, referer=referer, wait_until="networkidle", timeout=GOOGLE_PAGE_TIMEOUT_MS
+                url, referer=referer, wait_until="domcontentloaded", timeout=GOOGLE_PAGE_TIMEOUT_MS
             )
+            # SPAの描画を待つ（networkidleはハングするため手動wait）
+            page.wait_for_timeout(5000)
         except Exception as e:
             last_error = f"ページ読み込み失敗: {e}"
             if progress_callback:

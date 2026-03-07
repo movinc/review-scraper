@@ -478,7 +478,7 @@ def scrape_tripadvisor_reviews(url: str, progress_callback=None, review_save_cal
 
             fetch_kwargs = dict(
                 headless=True,
-                network_idle=True,
+                network_idle=False,
                 google_search=use_google_search,
                 page_action=action_fn,
                 wait=5,
