@@ -188,8 +188,12 @@ def scrape_tripadvisor_reviews(url: str, progress_callback=None, review_save_cal
                 html = page.content()
                 if "captcha-delivery" in html:
                     res["error"] = "CAPTCHA on landing page"
+                    gyazo_url = upload_screenshot(page, "TripAdvisor - CAPTCHA on landing")
                     if pcb:
-                        pcb(0, "トップページでCAPTCHA検出")
+                        msg = "トップページでCAPTCHA検出"
+                        if gyazo_url:
+                            msg += f" 📸 {gyazo_url}"
+                        pcb(0, msg)
                     return
 
                 gyazo_url = upload_screenshot(page, "TripAdvisor - top page OK")
@@ -255,8 +259,12 @@ def scrape_tripadvisor_reviews(url: str, progress_callback=None, review_save_cal
                 cards = query_all_first(page, TRIPADVISOR["review_card"])
                 if not cards:
                     res["error"] = "No review cards found after filter"
+                    gyazo_url = upload_screenshot(page, "TripAdvisor - no review cards")
                     if pcb:
-                        pcb(0, "レビューカード未検出")
+                        msg = "レビューカード未検出"
+                        if gyazo_url:
+                            msg += f" 📸 {gyazo_url}"
+                        pcb(0, msg)
                     return
 
                 actual_url = page.evaluate("() => window.location.href")
@@ -353,8 +361,12 @@ def scrape_tripadvisor_reviews(url: str, progress_callback=None, review_save_cal
                         pcb(len(all_reviews), f"ページ{page_num + 1}: {new_count}件取得 (合計{len(all_reviews)}件)")
 
                     if new_count == 0:
+                        gyazo_url = upload_screenshot(page, f"TripAdvisor - done ({len(all_reviews)} reviews)")
                         if pcb:
-                            pcb(len(all_reviews), f"ページ{page_num + 1}: 新規0件、収集完了")
+                            msg = f"ページ{page_num + 1}: 新規0件、収集完了"
+                            if gyazo_url:
+                                msg += f" 📸 {gyazo_url}"
+                            pcb(len(all_reviews), msg)
                         break
                     if new_count < TA_REVIEWS_PER_PAGE:
                         if pcb:
@@ -374,6 +386,9 @@ def scrape_tripadvisor_reviews(url: str, progress_callback=None, review_save_cal
                     try:
                         if pcb:
                             pcb(len(all_reviews), f"ページ{page_num + 1}へ遷移中...")
+                        gyazo_url = upload_screenshot(page, f"TripAdvisor - navigating to page {page_num+1}")
+                        if pcb and gyazo_url:
+                            pcb(len(all_reviews), f"📸 {gyazo_url}")
                         # JS native click でSPA遷移（Playwright click()はSPA遷移を発火しない）
                         page.evaluate("""() => {
                             const a = document.querySelector('a[aria-label*="Next"], a[aria-label*="次"]');

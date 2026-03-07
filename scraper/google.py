@@ -4,6 +4,7 @@ import re
 import glob
 import shutil
 import time
+import threading
 import uuid
 import random
 
@@ -601,8 +602,12 @@ def _collect_all_reviews(
 
         if time.time() - last_new_time > GOOGLE_STALL_SECONDS:
             # スクロール停止 → 取れた分で完了（部分成功）
+            gyazo_url = upload_screenshot(page, f"Google Maps - stall done ({len(all_reviews)} reviews)")
             if progress_callback:
-                progress_callback(len(all_reviews), f"{GOOGLE_STALL_SECONDS}秒間新規なし、収集終了 ({len(all_reviews)}件)")
+                msg = f"{GOOGLE_STALL_SECONDS}秒間新規なし、収集終了 ({len(all_reviews)}件)"
+                if gyazo_url:
+                    msg += f" 📸 {gyazo_url}"
+                progress_callback(len(all_reviews), msg)
             final = _extract_reviews_from_dom(page, saved_ids)
             all_reviews.extend(final)
             if review_save_callback and final:
