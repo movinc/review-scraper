@@ -379,7 +379,8 @@ function pickSrc(el){document.querySelectorAll('.source-opt').forEach(b=>b.class
 document.getElementById('url').addEventListener('input',function(){if(this.value.includes('tripadvisor'))pickSrc(document.querySelector('[data-source="tripadvisor"]'));else if(this.value.match(/google|goo\.gl|share\.google/))pickSrc(document.querySelector('[data-source="google"]'))});
 
 function esc(s){return s?s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/`/g,'&#96;').replace(/\$/g,'&#36;'):''}
-function fmtMsg(s){if(!s)return'';let h=esc(s);h=h.replace(/📸\s*(https:\/\/gyazo\.com\/[a-f0-9]+)/g,'<br><a href="$1" target="_blank"><img src="$1/raw" style="max-width:320px;max-height:200px;border-radius:6px;margin:4px 0;border:1px solid var(--border)" loading="lazy"></a>');return h}
+function fmtMsg(s){if(!s)return'';let h=esc(s);h=h.replace(/📸\s*(https:\/\/gyazo\.com\/[a-f0-9]+)/g,'<br><a href="$1" target="_blank"><img src="$1/raw" style="max-width:240px;max-height:150px;border-radius:6px;margin:4px 0;border:1px solid var(--border)" loading="lazy"></a>');return h}
+function fmtMsgText(s){if(!s)return'';return esc(s).replace(/📸\s*https:\/\/gyazo\.com\/[a-f0-9]+/g,'')}
 function extractName(u){if(!u)return'不明';try{let m=u.match(/\/maps\/place\/([^/@]+)/);if(m)return decodeURIComponent(m[1].replace(/\+/g,' '));m=u.match(/Reviews-([^-]+(?:-[^-]+)*?)-[A-Za-z]/);if(m)return decodeURIComponent(m[1].replace(/_/g,' '))}catch{}return u.substring(0,40)+'…'}
 function fmtDur(s){if(!s&&s!==0)return'';if(s<60)return s+'秒';return Math.floor(s/60)+'分'+(s%60?s%60+'秒':'')}
 function fmtCost(sec){if(!sec)return'';const usd=sec*0.0000530;if(usd<0.01)return'$'+usd.toFixed(4);return'$'+usd.toFixed(3)}
@@ -414,7 +415,7 @@ async function pollJob(id){
 function patchRunning(id,j){
   const card=document.querySelector('[data-id="'+id+'"]');if(!card)return;
   const st=card.querySelector('.j-stats');if(st){let h='';if(j.count)h+=j.count+'件 · ';h+=fmtElapsed(Date.now()-new Date(j.time).getTime())+'経過';st.textContent=h}
-  const pg=card.querySelector('.j-prog');if(pg)pg.innerHTML='<span class="sp"></span> '+fmtMsg(j.message);
+  const pg=card.querySelector('.j-prog');if(pg)pg.innerHTML='<span class="sp"></span> '+fmtMsgText(j.message);
   // 最新スクリーンショットを進捗エリアに表示
   let ssEl=card.querySelector('.job-screenshot');
   const ssUrl=j.last_screenshot||(j.message&&(j.message.match(/📸\s*(https:\/\/gyazo\.com\/[a-f0-9]+)/)||[])[1]);
@@ -441,7 +442,7 @@ function render(){
 
     let progHtml='';
     if(st==='running'&&j.message){
-      progHtml=`<div class="job-progress j-prog"><span class="sp"></span> ${fmtMsg(j.message)}</div>`;
+      progHtml=`<div class="job-progress j-prog"><span class="sp"></span> ${fmtMsgText(j.message)}</div>`;
       const ssU=j.last_screenshot||(j.message.match(/📸\s*(https:\/\/gyazo\.com\/[a-f0-9]+)/)||[])[1];
       if(ssU)progHtml+=`<div class="job-screenshot" data-url="${ssU}"><a href="${ssU}" target="_blank"><img src="${ssU}/raw" loading="lazy"></a></div>`;
     }
