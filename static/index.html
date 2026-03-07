@@ -141,7 +141,7 @@ tr:hover td{background:var(--surface2)}
 <body>
 <div class="app">
   <div class="header">
-    <h1><a href="/" style="color:inherit;text-decoration:none">Review Scraper</a></h1>
+    <h1><a href="/" style="color:inherit;text-decoration:none">Review Scraper</a> <span id="deploy-info" style="font-size:11px;color:var(--text-tertiary);font-weight:normal;margin-left:12px"></span></h1>
     <p>Google Maps・TripAdvisor の口コミを取得</p>
   </div>
   <div class="page-tabs">
@@ -502,6 +502,15 @@ function dl(b,n){const a=document.createElement('a');a.href=URL.createObjectURL(
 setInterval(()=>{for(const j of jobs){if(j.status!=='running')continue;const card=document.querySelector('[data-id="'+j.id+'"]');if(!card)continue;const st=card.querySelector('.j-stats');if(st){let h='';if(j.count)h+=j.count+'件 · ';h+=fmtElapsed(Date.now()-new Date(j.time).getTime())+'経過';st.textContent=h}}},5000);
 
 loadJobs();
+
+// Deploy info
+fetch('/build-info').then(r=>r.json()).then(d=>{
+  const el=document.getElementById('deploy-info');
+  if(el&&d.revision){
+    const ts=d.build_timestamp?new Date(parseInt(d.build_timestamp)*1000).toLocaleString('ja-JP',{timeZone:'Asia/Tokyo',month:'numeric',day:'numeric',hour:'2-digit',minute:'2-digit'}):'';
+    el.textContent=d.revision+(ts?' ('+ts+')':'');
+  }
+}).catch(()=>{});
 </script>
 </body>
 </html>

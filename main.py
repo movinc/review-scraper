@@ -1,3 +1,4 @@
+import os
 """FastAPI web service for scraping reviews from Google Maps and TripAdvisor."""
 import asyncio
 import re
@@ -31,6 +32,20 @@ def cleanup_stale_jobs():
             except Exception:
                 pass
 
+
+
+# --- Build info ---
+_BUILD_TIMESTAMP = ""
+try:
+    with open("/tmp/.build-timestamp", "r") as _bf:
+        _BUILD_TIMESTAMP = _bf.read().strip()
+except Exception:
+    pass
+_REVISION = os.environ.get("K_REVISION", "local")
+
+@app.get("/build-info")
+async def build_info():
+    return {"revision": _REVISION, "build_timestamp": _BUILD_TIMESTAMP}
 
 @app.get("/favicon.svg")
 def favicon():

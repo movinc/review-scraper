@@ -22,6 +22,7 @@ from config import (
 from utils.date_parser import parse_japanese_date
 from utils.tor import is_tor_available
 from css_selectors import TRIPADVISOR, query_first, query_all_first
+from utils.gyazo import upload_screenshot
 
 
 def _scrape_single_domain(url: str, progress_callback=None, review_save_callback=None, start_time=None):
@@ -211,8 +212,12 @@ def scrape_tripadvisor_reviews(url: str, progress_callback=None, review_save_cal
                 html2 = page.content()
                 if "captcha-delivery" in html2:
                     res["error"] = "CAPTCHA on restaurant page"
+                    gyazo_url = upload_screenshot(page, "TripAdvisor - CAPTCHA detected")
                     if pcb:
-                        pcb(0, "レストランページでCAPTCHA検出")
+                        msg = "レストランページでCAPTCHA検出"
+                        if gyazo_url:
+                            msg += f" 📸 {gyazo_url}"
+                        pcb(0, msg)
                     return
 
                 # 言語フィルタ: .comドメインのみFiltersモーダルで全言語選択
@@ -247,8 +252,12 @@ def scrape_tripadvisor_reviews(url: str, progress_callback=None, review_save_cal
                     return
 
                 actual_url = page.evaluate("() => window.location.href")
+                gyazo_url = upload_screenshot(page, f"TripAdvisor - {len(cards)} reviews found")
                 if pcb:
-                    pcb(0, f"レビュー検出OK ({len(cards)}件)、収集開始...")
+                    msg = f"レビュー検出OK ({len(cards)}件)、収集開始..."
+                    if gyazo_url:
+                        msg += f" 📸 {gyazo_url}"
+                    pcb(0, msg)
                     pcb(0, f"ページURL: {actual_url[:100]}")
 
                 # .comでフィルタ未適用 → リトライ
@@ -325,6 +334,11 @@ def scrape_tripadvisor_reviews(url: str, progress_callback=None, review_save_cal
                     elif pcb and not new_batch and cards:
                         pcb(len(all_reviews), f"パース結果: 全{len(cards)}件失敗（new_batch空）")
 
+                    # 5ページごとにGyazoスクリーンショット
+                    if page_num % 5 == 0:
+                        gyazo_url = upload_screenshot(page, f"TripAdvisor - page {page_num+1} ({len(all_reviews)} reviews)")
+                        if pcb and gyazo_url:
+                            pcb(len(all_reviews), f"📸 {gyazo_url}")
                     if pcb:
                         pcb(len(all_reviews), f"ページ{page_num + 1}: {new_count}件取得 (合計{len(all_reviews)}件)")
 
