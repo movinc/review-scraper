@@ -24,6 +24,88 @@ from utils.tor import is_tor_available
 from css_selectors import TRIPADVISOR, query_first, query_all_first
 
 
+def _scrape_single_domain(url: str, progress_callback=None, review_save_callback=None, start_time=None):
+    """単一ドメインでフィルタなし1回試行（フォールバック用）"""
+    base_url = _prepare_base_url(url)
+    domain_match = re.search(r'(https?://[^/]+)', url)
+    domain = domain_match.group(1) if domain_match else 'https://www.tripadvisor.jp'
+    pcb = progress_callback
+    rsc = review_save_callback
+
+    result = {"reviews": [], "error": None}
+
+    def make_fb_action(base, pcb, rsc, res):
+        def action(page):
+            page.goto(base.format(""), wait_until="domcontentloaded", timeout=TA_PAGE_TIMEOUT_MS)
+            for _w in range(TA_CARD_WAIT_SECONDS):
+                page.wait_for_timeout(1000)
+                if query_first(page, TRIPADVISOR["review_card"]):
+                    break
+            page.wait_for_timeout(2000)
+
+            cards = query_all_first(page, TRIPADVISOR["review_card"])
+            if not cards:
+                res["error"] = "No cards found"
+                return
+
+            if pcb:
+                pcb(0, f"フォールバック: {len(cards)}件検出")
+
+            all_reviews = []
+            seen_ids = set()
+            page_num = 0
+            while True:
+                if page_num > 0:
+                    cards = query_all_first(page, TRIPADVISOR["review_card"])
+                    if not cards:
+                        break
+
+                new_batch = []
+                for card in cards:
+                    review = _parse_review_card(card)
+                    if review:
+                        key = review.get('review_id', '') or f"{review['author']}_{review['comment'][:30]}"
+                        if key not in seen_ids:
+                            seen_ids.add(key)
+                            all_reviews.append(review)
+                            new_batch.append(review)
+
+                if rsc and new_batch:
+                    rsc(new_batch)
+                if pcb:
+                    pcb(len(all_reviews), f"フォールバック ページ{page_num+1}: {len(new_batch)}件 (合計{len(all_reviews)}件)")
+
+                if len(new_batch) < TA_REVIEWS_PER_PAGE:
+                    break
+
+                page_num += 1
+                if page_num >= TA_MAX_PAGES:
+                    break
+
+                page.evaluate("""() => {
+                    const a = document.querySelector('a[aria-label*="Next"], a[aria-label*="次"]');
+                    if (a) a.click();
+                }""")
+                page.wait_for_timeout(5000)
+
+            res["reviews"] = all_reviews
+        return action
+
+    try:
+        fetcher = StealthyFetcher()
+        fetcher.fetch(
+            domain + "/",
+            google_search=True,
+            page_action=make_fb_action(base_url, pcb, rsc, result),
+            headless=True,
+        )
+        if result["reviews"]:
+            return result["reviews"]
+    except Exception:
+        pass
+    return None
+
+
 def scrape_tripadvisor_reviews(url: str, progress_callback=None, review_save_callback=None) -> list[dict]:
     """Scrape all reviews from a TripAdvisor URL with pagination.
 
@@ -34,11 +116,20 @@ def scrape_tripadvisor_reviews(url: str, progress_callback=None, review_save_cal
     if "tripadvisor" not in url.lower():
         raise ValueError("TripAdvisorのURLを入力してください")
 
+    # .jp/.co.uk等 → .com に変換して全言語取得を試みる
+    original_url = url
+    original_domain_match = re.search(r'https?://www\.tripadvisor\.([a-z.]+)/', url)
+    original_tld = original_domain_match.group(1) if original_domain_match else None
+    if original_tld and original_tld != 'com':
+        url = re.sub(r'(https?://www\.tripadvisor\.)[a-z.]+/', r'\1com/', url)
+        if progress_callback:
+            progress_callback(0, f"ドメイン変換: .{original_tld} → .com（全言語取得）")
+
     base_url = _prepare_base_url(url)
     start_time = time.time()
 
     domain_match = re.search(r'(https?://[^/]+)', url)
-    domain = domain_match.group(1) if domain_match else 'https://www.tripadvisor.jp'
+    domain = domain_match.group(1) if domain_match else 'https://www.tripadvisor.com'
 
     last_error = ""
     for attempt in range(MAX_RETRIES):
@@ -350,6 +441,18 @@ def scrape_tripadvisor_reviews(url: str, progress_callback=None, review_save_cal
                 progress_callback(0, f"エラー: {e}、リトライ... ({attempt + 1}/{MAX_RETRIES})")
             time.sleep(3)
             continue
+
+    # .comで全試行失敗 → 元ドメインにフォールバック
+    if original_tld and original_tld != 'com':
+        if progress_callback:
+            progress_callback(0, f".comで失敗、.{original_tld}にフォールバック...")
+        try:
+            fb_result = _scrape_single_domain(original_url, progress_callback, review_save_callback, start_time)
+            if fb_result:
+                return fb_result
+        except Exception as fb_e:
+            if progress_callback:
+                progress_callback(0, f"フォールバックも失敗: {fb_e}")
 
     raise RuntimeError(f"TripAdvisor レビュー取得失敗 ({MAX_RETRIES}回リトライ済み): {last_error}")
 
