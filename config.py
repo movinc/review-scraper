@@ -9,7 +9,7 @@ DUPLICATE_URL_MINUTES = 5        # Reject same URL within this window
 
 # --- Google Maps ---
 GOOGLE_PAGE_TIMEOUT_MS = 60_000  # 60s
-GOOGLE_WARMUP_TIMEOUT_MS = 15_000  # 15s (was 30s)
+GOOGLE_WARMUP_TIMEOUT_MS = 30_000  # 15s (was 30s)
 GOOGLE_TAB_WAIT_SECONDS = 5     # 5s (was 8s)     # Wait after domcontentloaded for dynamic content
 GOOGLE_SCROLL_INTERVAL = 1.0
 GOOGLE_STALL_SECONDS = 60       # No new reviews for this long → finish

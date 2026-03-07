@@ -92,7 +92,7 @@ def _ensure_reviews_tab(url: str) -> str:
 def scrape_google_reviews(url: str, progress_callback=None, review_save_callback=None) -> list[dict]:
     """Scrape all reviews from a Google Maps URL."""
     url = _resolve_url(url)
-    url = _ensure_reviews_tab(url)
+    # Note: !9m1!1b1 は付けない（概要タブで開いてからクチコミタブをクリックする方が確実）
     _clean_browser_profiles()
     if not any(d in url.lower() for d in ["google.com/maps", "google.co.jp/maps", "maps.app.goo.gl", "maps.google", "share.google"]):
         raise ValueError("Google MapsのURLを入力してください")
@@ -128,14 +128,14 @@ def _warm_up_session(page, session):
         if not check["missing"]:
             return True
 
-        page.goto("https://www.google.co.jp/", wait_until="domcontentloaded", timeout=GOOGLE_WARMUP_TIMEOUT_MS)
+        page.goto("https://www.google.co.jp/", wait_until="networkidle", timeout=GOOGLE_WARMUP_TIMEOUT_MS)
         time.sleep(3)
-        page.goto("https://www.google.com/maps", wait_until="domcontentloaded", timeout=GOOGLE_WARMUP_TIMEOUT_MS)
+        page.goto("https://www.google.com/maps", wait_until="networkidle", timeout=GOOGLE_WARMUP_TIMEOUT_MS)
         time.sleep(3)
 
         check = _check_cookies(session)
         if check["missing"]:
-            page.goto("https://www.google.co.jp/search?q=maps", wait_until="domcontentloaded", timeout=GOOGLE_WARMUP_TIMEOUT_MS)
+            page.goto("https://www.google.co.jp/search?q=maps", wait_until="networkidle", timeout=GOOGLE_WARMUP_TIMEOUT_MS)
             time.sleep(3)
             check = _check_cookies(session)
 
@@ -234,7 +234,7 @@ def _start_session(url: str, progress_callback=None, proxy: str | None = None):
                 locale="ja-JP",
                 timezone_id="Asia/Tokyo",
                 user_data_dir=profile_dir,
-                disable_resources=True,
+                disable_resources=False,  # CSS/JSが必要（SPAの描画に必須）
                 hide_canvas=True,
                 block_webrtc=True,
                 google_search=True,
@@ -285,7 +285,7 @@ def _start_session(url: str, progress_callback=None, proxy: str | None = None):
         try:
             referer = generate_convincing_referer(url)
             page.goto(
-                url, referer=referer, wait_until="domcontentloaded", timeout=GOOGLE_PAGE_TIMEOUT_MS
+                url, referer=referer, wait_until="networkidle", timeout=GOOGLE_PAGE_TIMEOUT_MS
             )
         except Exception as e:
             last_error = f"ページ読み込み失敗: {e}"
@@ -434,24 +434,26 @@ def _cleanup_heavy_elements(page):
 
 
 def _scroll_reviews(page):
-    """Scroll the reviews container using combined approach."""
+    """Scroll the reviews container using incremental approach.
+    
+    scrollTop = scrollHeight（一気に最下部）だとGoogle側がlazy loadを
+    発火させないことがある。段階的スクロール（+800px）で確実に読み込ませる。
+    """
     try:
-        # Method 1: Find scrollable container and use scrollTop + mouse.wheel
         panel = page.query_selector('div.m6QErb.DxyBCb')
         if panel:
-            # First set scrollTop via JS (reliable in headless)
+            # 段階的スクロール（+800px）— 一気に最下部に飛ばない
             page.evaluate("""() => {
                 const el = document.querySelector('div.m6QErb.DxyBCb');
-                if (el) el.scrollTop = el.scrollHeight;
+                if (el) el.scrollTop += 800;
             }""")
-            # Then also fire mouse.wheel for human-like behavior
+            # mouse.wheel for human-like behavior
             try:
                 panel.hover()
-                page.mouse.wheel(0, 600)
+                page.mouse.wheel(0, 500)
             except Exception:
                 pass
         else:
-            # Fallback: wheel anywhere
             page.mouse.wheel(0, 800)
     except Exception:
         pass
@@ -462,7 +464,7 @@ def _try_stage1_recovery(page, progress_callback=None, count: int = 0) -> bool:
     try:
         if progress_callback:
             progress_callback(count, "Stage 1: ページリフレッシュで回復試行中...")
-        page.reload(wait_until="domcontentloaded", timeout=30000)
+        page.reload(wait_until="networkidle", timeout=30000)
         time.sleep(8)
         _click_reviews_tab(page)
         _sort_by_newest(page, progress_callback)
