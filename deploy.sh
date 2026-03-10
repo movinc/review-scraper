@@ -34,7 +34,7 @@ gcloud run deploy "$SERVICE" \
   --project "$PROJECT"
 
 # 4. Force traffic to latest revision
-LATEST=$(gcloud run revisions list --service "$SERVICE" --region "$REGION" --project "$PROJECT" --sort-by="~creationTimestamp" --limit=1 --format="value(name)" 2>/dev/null)
+LATEST=$(gcloud run revisions list --service "$SERVICE" --region "$REGION" --project "$PROJECT" --sort-by="~creationTimestamp" --filter="status.conditions.status=True" --limit=1 --format="value(name)" 2>/dev/null)
 echo "🔀 トラフィック切替: ${LATEST}"
 gcloud run services update-traffic "$SERVICE" \
   --to-revisions="${LATEST}=100" \
