@@ -481,11 +481,12 @@ def scrape_tripadvisor_reviews(url: str, progress_callback=None, review_save_cal
         try:
             action_fn = make_action(base_url, progress_callback, review_save_callback, result, start_time)
 
-            # 全試行直接（Tor不使用、失敗時はインスタンス切替リトライ）
-            # 試行1,3,5: google_search=True
-            # 試行2,4: google_search=False
-            use_google_search = (attempt % 2 == 0)
-            use_proxy = None
+            # CAPTCHA回避: 直接→Tor→直接+google→Tor+google→Torの順で試行
+            use_google_search = attempt >= 2  # 試行3以降はgoogle_search
+            tor_ok = is_tor_available()
+            use_proxy = TOR_PROXY_URL if (tor_ok and attempt % 2 == 1) else None  # 奇数試行はTor
+            if progress_callback and use_proxy:
+                progress_callback(0, f"Tor経由で接続中... (試行{attempt+1})")
 
             fetch_kwargs = dict(
                 headless=True,
